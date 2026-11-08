@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pegtrace"
+version = "0.1.0"
+description = "Trace an object from a photo and generate a 3D-printable pegboard holder"
+requires-python = ">=3.11"
+dependencies = [
+    "panel>=1.4",
+    "holoviews>=1.18",
+    "bokeh>=3.4",
+    "param>=2",
+    "numpy>=1.26",
+    "pillow>=10",
+    "contourpy>=1.2",
+    "shapely>=2.1",
+    "manifold3d>=3.0",
+    "pyvista>=0.43",
+    "vtk>=9.3",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.scripts]
+pegtrace = "pegtrace.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
