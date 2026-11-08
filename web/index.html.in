@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{TITLE}</title>
+  <script src="https://cdn.bokeh.org/bokeh/release/bokeh-{BOKEH}.min.js"></script>
+  <script src="https://cdn.bokeh.org/bokeh/release/bokeh-gl-{BOKEH}.min.js"></script>
+  <script src="https://cdn.bokeh.org/bokeh/release/bokeh-widgets-{BOKEH}.min.js"></script>
+  <script src="https://cdn.bokeh.org/bokeh/release/bokeh-tables-{BOKEH}.min.js"></script>
+  <script src="https://cdn.holoviz.org/panel/{PANEL}/dist/panel.min.js"></script>
+{EXTRA_HEAD}
+  <script src="pyjs_runtime_browser.js"></script>
+  <style>
+    :root { --bg: #ffffff; --fg: #1f2933; --muted: #52606d; --accent: #2f6fde; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #111418; --fg: #e4e7eb; --muted: #9aa5b1; } }
+    html, body { margin: 0; background: var(--bg); color: var(--fg);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    #boot { display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; min-height: 60vh; padding: 16px; text-align: center; }
+    #boot .spinner { width: 42px; height: 42px; border: 4px solid color-mix(in srgb, var(--muted) 30%, transparent);
+      border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+    #boot.error .spinner { display: none; }
+    #boot.error #boot-msg { color: #d64545; white-space: pre-wrap; text-align: left; max-width: 900px; }
+    #boot-msg { color: var(--muted); font-size: 14px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="boot"><div class="spinner"></div><div id="boot-msg">Loading…</div></div>
+  <div id="app"></div>
+  <script type="module">
+    import ManifoldModule from "https://cdn.jsdelivr.net/npm/manifold-3d@{MANIFOLD}/manifold.js";
+
+    const boot = document.getElementById("boot");
+    const msg = document.getElementById("boot-msg");
+    const status = (m) => { msg.textContent = m; console.log("[pegtrace] " + m); };
+    const fail = (e) => {
+      boot.classList.add("error");
+      msg.textContent = "PegTrace failed to start:\n" + (e && e.message ? e.message : e);
+      console.error("[pegtrace] startup failed", e);
+      globalThis.__pegtrace_state = "error";
+    };
+    globalThis.__pegtrace_state = "loading";
+
+    try {
+      status("Loading geometry kernel…");
+      const wasm = await ManifoldModule();
+      wasm.setup();
+      globalThis.manifold = wasm;
+
+      status("Starting Python (first load downloads ~{ENV_MB} MB)…");
+      const pyjs = await createModule({
+        locateFile: (f) => (f.endsWith(".wasm") ? "./" + f : f),
+      });
+      globalThis.pyjs = pyjs;
+      await pyjs.bootstrap_from_empack_packed_environment("./env/empack_env_meta.json", "./env/", false);
+
+      status("Starting app…");
+      globalThis.__pegtrace_app_code = await (await fetch("{APP}")).text();
+      await pyjs.async_exec_eval(`
+from pegtrace.webshim import install
+install()
+import js
+from panel.io.pyodide import init_doc, write
+init_doc()
+_ns = {"__name__": "__pegtrace_app__"}
+exec(compile(str(js.globalThis.__pegtrace_app_code), "{APP}", "exec"), _ns)
+# assignment, not a bare expression: pyjs' async_exec_eval runs a trailing expression twice
+_rendered = await write("app", _ns["app"])
+`);
+      boot.remove();
+      globalThis.__pegtrace_state = "ready";
+    } catch (e) {
+      fail(e);
+    }
+  </script>
+</body>
+</html>

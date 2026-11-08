@@ -138,6 +138,19 @@ class _PyBackend:
 # --------------------------------------------------------------------------
 # backend: JS manifold-3d through the browser JS bridge
 # --------------------------------------------------------------------------
+_JS_API = """(() => {
+  const w = globalThis.manifold;
+  const M = w.Manifold, C = w.CrossSection;
+  return {
+    cube: (s, c) => M.cube(s, c),
+    cylinder: (h, a, b, n, c) => M.cylinder(h, a, b, n, c),
+    sphere: (r, n) => M.sphere(r, n),
+    union: (arr) => M.union(arr),
+    ofPolygons: (p, f) => C.ofPolygons(p, f),
+  };
+})()"""
+
+
 class _JsBackend:
     name = "js"
 
@@ -155,9 +168,9 @@ class _JsBackend:
             self.js = js
             self._to_js = to_js
             self._to_py = lambda o: o.to_py()
-        wasm = self.js.globalThis.manifold
-        self.Manifold = wasm.Manifold
-        self.CrossSection = wasm.CrossSection
+        # pyjs binds functions fetched as attributes (losing a class's static
+        # members), so expose the static constructors through plain functions.
+        self.api = self.js.eval(_JS_API)
 
     def _vec(self, v):
         return self._to_js([float(x) for x in v])
@@ -167,9 +180,7 @@ class _JsBackend:
 
     # sections
     def section(self, contours):
-        if not contours:
-            return self.CrossSection.ofPolygons(self._to_js([]), "Positive")
-        return self.CrossSection.ofPolygons(self._contours_js(contours), "Positive")
+        return self.api.ofPolygons(self._contours_js(contours) if contours else self._to_js([]), "Positive")
 
     def section_empty(self, cs):
         return bool(cs.isEmpty())
@@ -189,16 +200,16 @@ class _JsBackend:
 
     # solids
     def empty(self):
-        return self.Manifold.union(self._to_js([]))
+        return self.api.union(self._to_js([]))
 
     def cube(self, size, center):
-        return self.Manifold.cube(self._vec(size), bool(center))
+        return self.api.cube(self._vec(size), bool(center))
 
     def cylinder(self, h, r_lo, r_hi, segments, center):
-        return self.Manifold.cylinder(float(h), float(r_lo), float(r_hi), int(segments), bool(center))
+        return self.api.cylinder(float(h), float(r_lo), float(r_hi), int(segments), bool(center))
 
     def sphere(self, r, segments):
-        return self.Manifold.sphere(float(r), int(segments))
+        return self.api.sphere(float(r), int(segments))
 
     def translate(self, m, v):
         return m.translate(self._vec(v))
@@ -214,7 +225,7 @@ class _JsBackend:
             return self.empty()
         if len(ms) == 1:
             return ms[0]
-        return self.Manifold.union(self._to_js(list(ms)))
+        return self.api.union(self._to_js(list(ms)))
 
     def subtract(self, a, b):
         return a.subtract(b)
