@@ -63,8 +63,8 @@ class _PyBackend:
     def section_area(self, cs):
         return cs.area()
 
-    def extrude(self, cs, height):
-        return cs.extrude(height)
+    def extrude(self, cs, height, scale_top):
+        return cs.extrude(height, 0, 0.0, (float(scale_top), float(scale_top)))
 
     # solids
     def empty(self):
@@ -182,8 +182,8 @@ class _JsBackend:
     def section_area(self, cs):
         return float(cs.area())
 
-    def extrude(self, cs, height):
-        return cs.extrude(float(height))
+    def extrude(self, cs, height, scale_top):
+        return cs.extrude(float(height), 0, 0.0, self._to_js([float(scale_top), float(scale_top)]))
 
     # solids
     def empty(self):
@@ -322,10 +322,11 @@ class Section:
     def offset(self, delta: float, segments: int = DEFAULT_SEGMENTS) -> "Section":
         return Section(backend().section_offset(self._h, delta, segments))
 
-    def extrude(self, height: float) -> "Solid":
+    def extrude(self, height: float, scale_top: float = 1.0) -> "Solid":
+        """Extrude along +Z; ``scale_top`` scales the top face about the origin."""
         if self.is_empty() or height <= 0:
             return Solid.empty()
-        return Solid(backend().extrude(self._h, height))
+        return Solid(backend().extrude(self._h, height, scale_top))
 
 
 class Solid:
