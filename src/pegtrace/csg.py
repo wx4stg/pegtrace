@@ -128,9 +128,11 @@ class _PyBackend:
 
     def mesh(self, m):
         mesh = m.to_mesh()
-        verts = np.asarray(mesh.vert_properties, dtype=np.float32)[:, :3]
-        tris = np.asarray(mesh.tri_verts, dtype=np.uint32)
-        return np.ascontiguousarray(verts), np.ascontiguousarray(tris)
+        # copy: nanobind arrays are views that would keep the Mesh alive
+        verts = np.array(np.asarray(mesh.vert_properties)[:, :3], dtype=np.float32, copy=True)
+        tris = np.array(mesh.tri_verts, dtype=np.uint32, copy=True)
+        del mesh
+        return verts, tris
 
 
 # --------------------------------------------------------------------------
