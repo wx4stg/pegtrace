@@ -10,7 +10,7 @@ from PIL import Image, ImageFilter
 from shapely import affinity
 from shapely.geometry import Polygon
 
-from .calibration import Calibration
+from .calibration import Calibration, dilate, erode, otsu, value_saturation
 from .geom2d import clean, fill_holes, largest_polygon
 
 
@@ -83,20 +83,50 @@ def outline_stats(poly: Polygon) -> dict:
     }
 
 
-def _otsu(values: np.ndarray) -> float:
-    hist, edges = np.histogram(values, bins=256)
-    hist = hist.astype(float)
-    centers = (edges[:-1] + edges[1:]) / 2
-    w0 = np.cumsum(hist)
-    w1 = w0[-1] - w0
-    m0 = np.cumsum(hist * centers)
-    mt = m0[-1]
-    with np.errstate(divide="ignore", invalid="ignore"):
-        mu0 = m0 / w0
-        mu1 = (mt - m0) / w1
-        between = w0 * w1 * (mu0 - mu1) ** 2
-    between = np.nan_to_num(between)
-    return float(centers[int(np.argmax(between))])
+_otsu = otsu  # kept for callers of the old name
+
+
+def _grid_smooth(values: np.ndarray, region: tuple[int, int, int, int], cell: int, q: float,
+                 valid: np.ndarray | None = None) -> np.ndarray:
+    """A smooth map of the ``q``-th percentile of ``values`` over ``cell``-sized blocks of
+    ``region`` (r0, r1, c0, c1), using only ``valid`` pixels (the paper). Blocks with too
+    few of them are filled from their neighbours; then a 3x3 median and interpolation back
+    to full size. Zero outside the region."""
+    r0, r1, c0, c1 = region
+    gy, gx = max((r1 - r0) // cell, 1), max((c1 - c0) // cell, 1)
+    rs = np.linspace(r0, r1, gy + 1).astype(int)
+    cs = np.linspace(c0, c1, gx + 1).astype(int)
+    g = np.full((gy, gx), np.nan)
+    for i in range(gy):
+        for j in range(gx):
+            blk = values[rs[i]:rs[i + 1], cs[j]:cs[j + 1]]
+            if valid is not None:
+                blk = blk[valid[rs[i]:rs[i + 1], cs[j]:cs[j + 1]]]
+            if blk.size >= 0.15 * (rs[i + 1] - rs[i]) * (cs[j + 1] - cs[j]):
+                g[i, j] = np.percentile(blk, q)
+    if np.isnan(g).all():
+        g[:] = np.percentile(values[r0:r1, c0:c1], q)
+    while np.isnan(g).any():  # fill from neighbours, growing inwards
+        p = np.pad(g, 1, constant_values=np.nan)
+        nb = np.stack([p[i:i + gy, j:j + gx] for i in range(3) for j in range(3)])
+        with np.errstate(all="ignore"), __import__("warnings").catch_warnings():
+            __import__("warnings").simplefilter("ignore", RuntimeWarning)
+            fill = np.nanmean(nb, axis=0)
+        g = np.where(np.isnan(g), fill, g)
+    p = np.pad(g, 1, mode="edge")
+    g = np.median(np.stack([p[i:i + gy, j:j + gx] for i in range(3) for j in range(3)]), axis=0)
+    im = Image.fromarray(g.astype(np.float32), mode="F").resize((c1 - c0, r1 - r0), Image.Resampling.BILINEAR)
+    out = np.zeros(values.shape, np.float32)
+    out[r0:r1, c0:c1] = np.asarray(im)
+    return out
+
+
+def _object_score(v, sat, region, ppm, valid=None, cell_mm=12.0):
+    """How much each pixel stands out from the paper around it (>= 1: clearly)."""
+    cell = max(int(cell_mm * ppm), 4)
+    paper_v = _grid_smooth(v, region, cell, 90, valid)
+    paper_s = _grid_smooth(sat, region, cell, 20, valid)
+    return np.maximum((1 - v / np.maximum(paper_v, 1)) / 0.35, (sat - paper_s) / 0.25)
 
 
 def autodetect(
@@ -105,12 +135,17 @@ def autodetect(
     blur_mm: float = 0.8,
     work_px: int = 1000,
     min_area_mm2: float = 25.0,
+    threshold: float = 0.7,
+    close_mm: float = 1.5,
 ) -> Polygon:
-    """Find the object as the largest region that differs from the background.
+    """Find the object as the largest region that stands out from the paper around it.
 
-    Background colour is sampled from a band just inside the reference
-    rectangle (paper) when available, otherwise from the image border.
-    Returns an empty polygon when nothing plausible is found.
+    Inside the reference rectangle (paper) when there is one, otherwise in the whole image.
+    The paper's brightness and saturation are estimated locally on a coarse grid, so a shadow
+    across the paper is not mistaken for the object. A pixel belongs to the object when it is
+    much darker than the paper nearby (by 35 % at a score of 1) or much more saturated (by
+    0.25), and ``threshold`` is the score that counts. Returns an empty polygon when nothing
+    plausible is found.
     """
     from contourpy import contour_generator
 
@@ -122,40 +157,34 @@ def autodetect(
     arr = np.asarray(img, dtype=float)
     ny, nx = arr.shape[:2]
     left, _, _, top = cal.bounds
-    cols = left + (np.arange(nx) + 0.5) / ppm
-    rows = top - (np.arange(ny) + 0.5) / ppm
-    xx, yy = np.meshgrid(cols, rows)
 
-    region = np.ones((ny, nx), bool)
     if cal.reference is not None and restrict_to_reference:
         rx0, ry0, rx1, ry1 = cal.reference
         inset = 0.02 * max(rx1 - rx0, ry1 - ry0)
-        band = 0.06 * max(rx1 - rx0, ry1 - ry0)
-        region = (xx > rx0 + inset) & (xx < rx1 - inset) & (yy > ry0 + inset) & (yy < ry1 - inset)
-        inner = (xx > rx0 + band) & (xx < rx1 - band) & (yy > ry0 + band) & (yy < ry1 - band)
-        sample = arr[region & ~inner]
+        c0, c1 = int((rx0 + inset - left) * ppm), int(np.ceil((rx1 - inset - left) * ppm))
+        r0, r1 = int((top - (ry1 - inset)) * ppm), int(np.ceil((top - (ry0 + inset)) * ppm))
+        box_ = (max(r0, 0), min(r1, ny), max(c0, 0), min(c1, nx))
     else:
-        b = max(2, int(0.03 * min(nx, ny)))
-        sample = np.concatenate([arr[:b].reshape(-1, 3), arr[-b:].reshape(-1, 3),
-                                 arr[:, :b].reshape(-1, 3), arr[:, -b:].reshape(-1, 3)])
-    if len(sample) == 0:
+        box_ = (0, ny, 0, nx)
+    r0, r1, c0, c1 = box_
+    if r1 - r0 < 4 or c1 - c0 < 4:
         return Polygon()
-    bg = np.median(sample, axis=0)
-    dist = np.linalg.norm(arr - bg, axis=2)
-    dist[~region] = 0.0
-    if dist.max() <= 0:
-        return Polygon()
-    d8 = Image.fromarray(np.clip(dist / dist.max() * 255, 0, 255).astype(np.uint8))
-    d8 = d8.filter(ImageFilter.GaussianBlur(max(blur_mm * ppm, 0.5)))
-    d = np.asarray(d8, dtype=float)
-    vals = d[region]
-    thr = _otsu(vals) if vals.size else 128.0
-    thr = max(thr, 20.0)  # ignore tiny colour noise on blank paper
-    mask = (d > thr) & region
+    region = np.zeros((ny, nx), bool)
+    region[r0:r1, c0:c1] = True
+
+    v, sat = value_saturation(arr)
+    # two passes: big cells find the obvious object, then small cells model the paper
+    # (and its shadows) from the rest, so a wide object doesn't become its own "paper"
+    rough = dilate(_object_score(v, sat, box_, ppm, cell_mm=40.0) > 1.0, max(int(ppm), 1))
+    score = _object_score(v, sat, box_, ppm, valid=~rough)
+    score[~region] = 0.0
+    s8 = Image.fromarray(np.clip(score * 128, 0, 255).astype(np.uint8))
+    s8 = s8.filter(ImageFilter.GaussianBlur(max(blur_mm * ppm, 0.5)))
+    rc = max(int(close_mm * ppm / 2), 1)
+    mask = erode(dilate((np.asarray(s8) > threshold * 128) & region, rc), rc)  # join shiny gaps
     if not mask.any():
         return Polygon()
-    z = np.pad(mask.astype(float), 1)  # pad so contours close
-    lines = contour_generator(z=z).lines(0.5)
+    lines = contour_generator(z=np.pad(mask.astype(float), 1)).lines(0.5)  # pad so contours close
     best = Polygon()
     for line in lines:
         if len(line) < 4:

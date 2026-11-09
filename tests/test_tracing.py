@@ -62,3 +62,19 @@ def test_merge_close_vertices_keeps_narrow_tabs():
     tab = box(0, 0, 60, 20).union(box(28, 20, 32, 50))  # a 4 mm wide tab sticking up
     merged = merge_close_vertices(tab, 5.0)
     assert merged.equals(tab.normalize()) or abs(merged.area - tab.area) < 1e-6
+
+
+def test_autodetect_ignores_shadow_on_paper():
+    """Real photo with a shadow across part of the paper: the outline must follow the tool,
+    not the shadow. Compare with a hand-traced outline (which is a little generous)."""
+    import json
+    from pathlib import Path
+
+    from pegtrace.params import PAPER_SIZES
+
+    data = Path(__file__).parent / "data"
+    truth = json.loads((data / "wire_strippers.json").read_text())
+    cal = rectify_rectangle(Image.open(data / "wire_strippers.jpg"), truth["corners_px"], PAPER_SIZES[truth["paper"]])
+    p = autodetect(cal)
+    t = Polygon(truth["outline_mm"])
+    assert p.intersection(t).area / p.union(t).area > 0.85
