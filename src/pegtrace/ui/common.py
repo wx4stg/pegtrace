@@ -66,3 +66,24 @@ def show(alert: pn.pane.Alert, text: str, kind: str = "info") -> None:
     alert.object = text
     alert.alert_type = kind
     alert.visible = bool(text)
+
+
+def run_busy(target, fn) -> None:
+    """Run ``fn`` with Panel's loading spinner over ``target``.
+
+    On the static site Python runs on the page's own thread, so nothing shows until Python
+    returns to the browser: set the spinner, return, and do the work on the next tick.
+    Without a page (tests, scripts) ``fn`` just runs.
+    """
+    if pn.state.curdoc is None:
+        fn()
+        return
+    target.loading = True
+
+    def run():
+        try:
+            fn()
+        finally:
+            target.loading = False
+
+    pn.state.add_periodic_callback(run, period=60, count=1)

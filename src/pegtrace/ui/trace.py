@@ -7,10 +7,10 @@ import numpy as np
 import panel as pn
 from shapely.geometry import Polygon
 
-from ..plotting import equal_aspect, fast_taps
+from ..plotting import equal_aspect, fast_taps, safe_patches
 from ..state import AppState
 from ..tracing import outline_stats
-from .common import FILL_WINDOW, display_array, help_text, show, status_alert
+from .common import FILL_WINDOW, display_array, help_text, run_busy, show, status_alert
 
 
 def cal_rgb(data) -> hv.RGB:
@@ -36,7 +36,7 @@ class TraceStep:
         self.simplify = pn.widgets.FloatSlider.from_param(state.param.simplify_tol, name="Smooth / simplify (mm)")
         self.stats = pn.pane.Markdown("No outline yet.", margin=(5, 10))
         self.auto.on_click(self._on_auto)
-        self.clear.on_click(lambda _: state.set_outline(None))
+        self.clear.on_click(lambda _: run_busy(self.plot_pane, lambda: state.set_outline(None)))
         self.done.on_click(self._on_done)
 
         self.poly_pipe = hv.streams.Pipe(data=[])
@@ -46,6 +46,7 @@ class TraceStep:
                                         shared=True, show_vertices=True)
         self.edit.add_subscriber(self._on_edit)
         self.lasso = None  # recreated with each image, see view()
+        self.plot_pane = None  # see view()
 
         state.param.watch(self._on_outline, "outline")
 
@@ -59,17 +60,23 @@ class TraceStep:
                                  f"area {st['area'] / 100:.1f} cm², {st['vertices']} vertices")
         if self._from_edit:
             return
-        if p is None:
-            self.poly_pipe.send([])
-        else:
-            c = np.asarray(p.exterior.coords)[:-1]
-            self.poly_pipe.send([{"x": c[:, 0], "y": c[:, 1]}])
+        self._send(np.zeros((0, 2)) if p is None else np.asarray(p.exterior.coords)[:-1])
+
+    def _send(self, coords):
+        self.poly_pipe.send([{"x": coords[:, 0], "y": coords[:, 1]}] if len(coords) else [])
 
     def _on_lasso(self, geometry):
         if geometry is None or len(geometry) < 3:
             return
-        self.state.set_outline(Polygon(np.asarray(geometry, float)))
-        show(self.alert, "Outline traced. Drag the red vertices to refine it.", "success")
+        coords = np.asarray(geometry, float)
+        # the selection vanishes when it closes: show it straight away, while the holder updates
+        self._send(coords)
+
+        def apply():
+            self.state.set_outline(Polygon(coords))
+            show(self.alert, "Outline traced. Drag the red vertices to refine it.", "success")
+
+        run_busy(self.plot_pane, apply)
 
     def _on_edit(self, data):
         if not data or not data.get("xs"):
@@ -81,13 +88,20 @@ class TraceStep:
         cur = self.state.outline
         if cur is not None and poly.symmetric_difference(cur).area < 1e-6:
             return
-        self._from_edit = True
-        try:
-            self.state.set_outline(poly, simplify=False)  # keep exactly what the user edited
-        finally:
-            self._from_edit = False
+
+        def apply():
+            self._from_edit = True
+            try:
+                self.state.set_outline(poly, simplify=False)  # keep exactly what the user edited
+            finally:
+                self._from_edit = False
+
+        run_busy(self.plot_pane, apply)
 
     def _on_auto(self, _):
+        run_busy(self.plot_pane, self._autodetect)
+
+    def _autodetect(self):
         try:
             ok = self.state.autodetect()
         except Exception as e:
@@ -122,9 +136,9 @@ class TraceStep:
             self.lasso = hv.streams.Lasso(source=rgb)
             self.lasso.add_subscriber(self._on_lasso)
             return (rgb * self.polys).opts(
-                hv.opts.Overlay(data_aspect=1, hooks=[equal_aspect, fast_taps], responsive=True, min_height=600, xlabel="x (mm)", ylabel="y (mm)",
+                hv.opts.Overlay(data_aspect=1, hooks=[equal_aspect, fast_taps, safe_patches], responsive=True, min_height=600, xlabel="x (mm)", ylabel="y (mm)",
                                 active_tools=["poly_select"]))
 
-        return pn.Row(controls, pn.pane.HoloViews(plot, sizing_mode="stretch_both", min_height=600,
-                                                  linked_axes=False),
+        self.plot_pane = pn.pane.HoloViews(plot, sizing_mode="stretch_both", min_height=600, linked_axes=False)
+        return pn.Row(controls, self.plot_pane,
                       sizing_mode="stretch_width", styles=FILL_WINDOW)

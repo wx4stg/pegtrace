@@ -68,3 +68,26 @@ def fast_taps(plot, element) -> None:
         return
     plot.state.js_on_change("inner_width", CustomJS(code=_FAST_TAPS_JS))
     plot._fast_taps = True
+
+
+# BokehJS 3.9 (the static site) repaints at once when the layout changes. If a polygon was
+# emptied earlier in the same update, its view still holds the old row indices and painting
+# throws "Out of bounds: 0 <= 0 < 0". Skip rows the data no longer has.
+_SAFE_PATCHES_JS = """
+if (!globalThis.__pegtrace_safe_patches) {
+  const P = Bokeh.require("models/glyphs/patches").PatchesView.prototype, paint = P._paint;
+  P._paint = function (ctx, indices, data) {
+    const xs = (data && data.sxs) || this.sxs, n = xs == null ? 0 : xs.length;
+    return paint.call(this, ctx, Array.from(indices).filter((i) => i < n), data);
+  };
+  globalThis.__pegtrace_safe_patches = true;
+}
+"""
+
+
+def safe_patches(plot, element) -> None:
+    """HoloViews hook for plots whose polygons can be emptied from Python (see above)."""
+    if getattr(plot, "_safe_patches", False):
+        return
+    plot.state.js_on_change("inner_width", CustomJS(code=_SAFE_PATCHES_JS))
+    plot._safe_patches = True

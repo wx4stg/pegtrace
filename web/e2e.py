@@ -203,8 +203,30 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
         for dx, dy in pts:
             page.mouse.click(cx + dx, cy + dy)
             page.wait_for_timeout(150)  # quick clicks: bokeh reports them as double taps (see fast_taps)
+        # Record when the browser gets "loading" updates. (On the static site Python blocks the
+        # page while it works, so the test can't look for the spinner then; it can only check
+        # that the spinner was switched on before the work and off after it.)
+        page.evaluate("""() => {
+          const D = Bokeh.require("document/document").Document, apply = D.prototype.apply_json_patch;
+          window.__loading = [];
+          D.prototype.apply_json_patch = function (patch, ...rest) {
+            for (const e of patch.events || []) {  // Panel's loading spinner is a pn-loading css class
+              if (e.attr === "css_classes") {
+                window.__loading.push([performance.now(), String(e.model && e.model.id), e.new.includes("pn-loading")]);
+              }
+            }
+            return apply.call(this, patch, ...rest);
+          };
+        }""")
         page.keyboard.press("Enter")  # bokeh 3 finishes poly_select with Enter or press-and-hold
         r.wait_text("4 vertices", timeout=60_000)
+        try:  # the spinner goes off just after the outline arrives
+            page.wait_for_function("() => window.__loading.some(e => !e[2])", timeout=30_000)
+        except Exception:
+            pass
+        log = page.evaluate("window.__loading")
+        spans = [t1 - t0 for t0, m0, on0 in log if on0 for t1, m1, on1 in log if m1 == m0 and not on1 and t1 > t0]
+        r.check(bool(spans), f"spinner showed while the outline was applied (for {max(spans, default=0):.0f} ms)")
         r.check(True, "hand-drawn polygon reached Python with every click")
         r.shot("hand_trace")
         r.click("Clear")
