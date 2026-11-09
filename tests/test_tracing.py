@@ -42,21 +42,14 @@ def test_auto_down_angle_puts_heavy_end_down(hammer):
     assert o.centroid.y < (o.bounds[3] - o.bounds[1]) / 2
 
 
-def test_insert_vertex_extends_or_splits():
-    from pegtrace.tracing import insert_vertex
+def test_ring_vertices_drops_repeats():
+    from pegtrace.ui.trace import ring_vertices
 
-    sq = [(0, 0), (100, 0), (100, 100)]
-    # far from every edge: continues after the last added vertex
-    v, i = insert_vertex(sq, (-10, 150), after=2, snap=2)
-    assert i == 3 and v[3] == (-10.0, 150.0)
-    v, i = insert_vertex(sq, (-10, 150), after=0, snap=2)
-    assert i == 1
-    # on an edge: splits it
-    v, i = insert_vertex(sq, (100.5, 50), after=0, snap=2)
-    assert i == 2 and v == [(0, 0), (100, 0), (100.5, 50), (100, 100)]
-    # the first points just append
-    assert insert_vertex([], (1, 2), after=-1, snap=0) == ([(1.0, 2.0)], 0)
-    assert insert_vertex([(0, 0)], (5, 5), after=0, snap=0)[1] == 1
+    # mid-drawing: the last point is repeated under the cursor
+    assert ring_vertices([0, 10, 10, 10], [0, 0, 5, 5]) == [(0.0, 0.0), (10.0, 0.0), (10.0, 5.0)]
+    # closed ring and NaN padding
+    assert ring_vertices([0, 10, 10, 0, float("nan")], [0, 0, 5, 0, 1]) == [(0.0, 0.0), (10.0, 0.0), (10.0, 5.0)]
+    assert ring_vertices([], []) == []
 
 
 def test_merge_close_vertices_makes_sharp_corners():

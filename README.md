@@ -22,11 +22,12 @@ locally with `panel serve`, or as a **fully static web page** with Python runnin
      perspective-corrected, so the camera doesn't need to be exactly overhead.
    - *Two points*: mark two ruler marks a known distance apart. This gives scale only, with no perspective
      correction.
-3. **Trace**: the same point tools as the Scale step, plus adding points. Click around the object, or press
-   **Auto-detect**.
-   - Each click adds a point, and the dashed outline closes itself.
-   - Drag a point to move it. Click on the dashed line to add a point there.
-   - To delete a point, click it and press **Backspace**, or use *Remove last point*.
+3. **Trace**: draw the outline with Bokeh's polygon tools, or press **Auto-detect**.
+   - Draw: press and hold to place the first point, click to add more, and press **Esc** to finish (or
+     press and hold for the last point).
+   - Once there is an outline, the edit tool takes over and shows its points. Drag a point to move it. To
+     add points, press and hold a point, click where the new ones go, and press **Esc**. To delete a
+     point, click it and press **Backspace**. *Clear* starts over.
    - Auto-detect merges the points of rounded corners into one point each. A slider smooths or simplifies
      the outline. Points you place by hand are kept exactly.
 4. **Orientation**: pick the mount style, then set the arrow.
@@ -140,7 +141,7 @@ Notes on the browser runtime:
 
 The end-to-end test drives every step with real clicks:
 - loads the sample photo and calibrates;
-- clicks an outline by hand, splits an edge and drags a vertex, then auto-detects the outline;
+- draws an outline by hand, drags, inserts and deletes vertices, clears it, then auto-detects the outline;
 - picks an orientation and checks the views, including Shelf mode and the ring style;
 - switches to the dark theme;
 - downloads the STL;

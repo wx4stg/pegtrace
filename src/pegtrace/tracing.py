@@ -33,32 +33,6 @@ def prepare_outline(poly, simplify_tol: float = 0.0) -> Polygon:
     return shapely.geometry.polygon.orient(p, 1.0)
 
 
-def insert_vertex(verts, p, after: int, snap: float) -> tuple[list, int]:
-    """Add vertex ``p`` to the closed polygon ``verts``.
-
-    A click within ``snap`` of an edge splits that edge (refining an outline); any other
-    click continues the outline right after vertex ``after`` (drawing). Returns the new
-    vertex list and the index of the new vertex.
-    """
-    verts = [tuple(map(float, v)) for v in verts]
-    p = (float(p[0]), float(p[1]))
-    n = len(verts)
-    idx = n if not (0 <= after < n) else after + 1
-    if n >= 2:
-        a = np.asarray(verts)
-        b = np.roll(a, -1, axis=0)
-        if n == 2:
-            a, b = a[:1], b[:1]
-        ab = b - a
-        t = np.clip(((np.asarray(p) - a) * ab).sum(1) / np.maximum((ab * ab).sum(1), 1e-12), 0, 1)
-        d = np.hypot(*(a + ab * t[:, None] - np.asarray(p)).T)
-        i = int(np.argmin(d))
-        if d[i] <= snap:
-            idx = i + 1
-    verts.insert(idx, p)
-    return verts, idx
-
-
 def merge_close_vertices(poly: Polygon, min_edge: float) -> Polygon:
     """Merge vertices closer than ``min_edge`` (e.g. the 2-3 points a rounded corner
     leaves), so each corner is one point that is easy to grab.

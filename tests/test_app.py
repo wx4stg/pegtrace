@@ -38,44 +38,39 @@ def test_full_ui_flow(app):
     assert len(export._project().getvalue()) > 1000
 
 
-def test_point_draw_trace(app):
+def test_poly_draw_trace(app):
     state, steps = app.state, app.steps
     steps[0]._on_sample(None)
     steps[1]._on_apply(None)
     trace = steps[2]
+    # PolyDraw sends the polygon after each click, with the last point repeated under the cursor
     clicks = [(20, 20), (120, 25), (110, 200), (30, 190)]
     xs, ys = [], []
-    for x, y in clicks:  # the browser sends all points after each click, the new one last
+    for x, y in clicks:
         xs.append(x)
         ys.append(y)
-        trace._on_draw({"x": list(xs), "y": list(ys)})
+        trace._on_draw({"xs": [xs + [x]], "ys": [ys + [y]]})
     assert state.outline is not None and state.outline.area > 10000
     assert trace.verts == [(20.0, 20.0), (120.0, 25.0), (110.0, 200.0), (30.0, 190.0)]
-    # a click on the edge between vertices 1 and 2 splits it, wherever the browser put it
-    trace._on_draw({"x": xs + [115], "y": ys + [112]})
-    assert trace.verts[2] == (115.0, 112.0) and len(trace.verts) == 5
-    assert len(state.outline.exterior.coords) - 1 == 5  # hand-placed points are not simplified away
-    # drag the new vertex outward
+    # PolyEdit: insert a vertex between 1 and 2 and drag it
     v = list(trace.verts)
-    v[2] = (160.0, 112.0)
-    trace._on_draw({"x": [a for a, _ in v], "y": [b for _, b in v]})
+    v.insert(2, (160.0, 112.0))
+    trace._on_draw({"xs": [[a for a, _ in v]], "ys": [[b for _, b in v]]})
+    assert len(state.outline.exterior.coords) - 1 == 5  # hand-placed points are not simplified away
     assert abs(state.outline.bounds[2] - 160) < 1e-6
-    # delete it (Backspace), then undo the last point
+    # delete it (Backspace)
     del v[2]
-    trace._on_draw({"x": [a for a, _ in v], "y": [b for _, b in v]})
+    trace._on_draw({"xs": [[a for a, _ in v]], "ys": [[b for _, b in v]]})
     assert len(trace.verts) == 4 and state.outline.bounds[2] < 125
-    trace._on_undo(None)
-    assert len(trace.verts) == 3 and state.outline is not None
-    trace._on_undo(None)
-    assert state.outline is None
-    # Clear removes points even when there are too few for an outline
-    trace._on_draw({"x": [10, 50], "y": [10, 10]})
+    # too few points: no outline
+    trace._on_draw({"xs": [[10, 50]], "ys": [[10, 10]]})
     assert len(trace.verts) == 2 and state.outline is None
     trace._on_clear(None)
-    assert trace.verts == [] and trace.vert_pipe.data == []
-    # outlines from auto-detect show up as editable vertices
+    assert trace.verts == [] and len(trace.poly_pipe.data) == 0
+    # outlines from auto-detect show up as an editable polygon
     trace._on_auto(None)
     assert state.outline is not None and len(trace.verts) == len(state.outline.exterior.coords) - 1
+    assert len(trace.poly_pipe.data) == len(trace.verts)
 
 
 def test_corner_drag_updates_state(app):
