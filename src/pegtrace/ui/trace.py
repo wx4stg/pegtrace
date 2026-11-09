@@ -128,15 +128,15 @@ class TraceStep:
             pn.Row(self.auto, self.clear), self.simplify, self.stats, self.done, self.alert,
             width=340,
         )
-        # A fresh plot per calibration: with data_aspect + responsive, HoloViews does not
-        # update the axis ranges of an existing plot, so streamed images would be cropped.
+        # A fresh plot per calibration: HoloViews does not update the axis ranges of an
+        # existing responsive plot, so streamed images would be cropped.
         @pn.depends(self.state.param.calibration)
         def plot(cal):
             rgb = cal_rgb(cal).opts(tools=["poly_select"], default_tools=["pan", "wheel_zoom", "reset"])
             self.lasso = hv.streams.Lasso(source=rgb)
             self.lasso.add_subscriber(self._on_lasso)
             return (rgb * self.polys).opts(
-                hv.opts.Overlay(data_aspect=1, hooks=[equal_aspect, fast_taps, safe_patches], responsive=True, min_height=600, xlabel="x (mm)", ylabel="y (mm)",
+                hv.opts.Overlay(hooks=[equal_aspect, fast_taps, safe_patches], responsive=True, min_height=600, xlabel="x (mm)", ylabel="y (mm)",
                                 active_tools=["poly_select"]))
 
         self.plot_pane = pn.pane.HoloViews(plot, sizing_mode="stretch_both", min_height=600, linked_axes=False)

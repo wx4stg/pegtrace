@@ -54,7 +54,7 @@ class LoadStep:
         )
         @pn.depends(self.state.param.photo)
         def image(photo):
-            return photo_rgb(photo).opts(data_aspect=1, hooks=[equal_aspect], responsive=True, min_height=500, xaxis=None, yaxis=None,
+            return photo_rgb(photo).opts(hooks=[equal_aspect], responsive=True, min_height=500, xaxis=None, yaxis=None,
                                          default_tools=["pan", "wheel_zoom", "reset"], active_tools=["wheel_zoom"])
 
         return pn.Row(controls, pn.pane.HoloViews(image, sizing_mode="stretch_both", min_height=500, linked_axes=False),

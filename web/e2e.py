@@ -267,6 +267,16 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
         r.wait_text("No problems found.", timeout=120_000)
         r.check(True, "typed ring height applied with Update holder")
         page.wait_for_timeout(1500)
+        fv = page.evaluate("""() => {
+          const all = Bokeh.documents.flatMap(d => [...d.all_models]);
+          const p = all.filter(m => m.title && m.title.text === 'Front (looking at the board)').pop();
+          const xs = p.x_range.end - p.x_range.start, ys = p.y_range.end - p.y_range.start;
+          return [p.inner_width, p.inner_height, xs / p.inner_width, ys / p.inner_height];
+        }""")
+        r.check(fv[0] > 600 and abs(fv[2] - fv[3]) < 0.02 * fv[2],
+                f"tall holder: front view fills the width at 1:1 (frame {fv[0]:.0f} x {fv[1]:.0f} px, "
+                f"{fv[2]:.3f} vs {fv[3]:.3f} mm/px)")
+        page.wait_for_timeout(1500)
         r.shot("design_front")
         r.tab("Side section")
         r.shot("design_side")

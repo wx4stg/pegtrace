@@ -137,7 +137,7 @@ class CalibrateStep:
         def plot(method, photo):
             layer = self.corners_layer if method == RECT else self.ruler_layer
             obj = (photo_rgb(photo).opts(default_tools=["pan", "wheel_zoom", "reset"]) * layer).opts(
-                hv.opts.Overlay(data_aspect=1, hooks=[equal_aspect, fast_taps], responsive=True, min_height=560, xaxis=None, yaxis=None,
+                hv.opts.Overlay(hooks=[equal_aspect, fast_taps], responsive=True, min_height=560, xaxis=None, yaxis=None,
                                 active_tools=["point_draw"]))
             return pn.pane.HoloViews(obj, sizing_mode="stretch_both", min_height=560, linked_axes=False)
 

@@ -92,7 +92,7 @@ def front_view(result: HolderResult, pb: PegboardParams, height: int = 520) -> h
     layers.append(hv.Points(hooks, label="hooks").opts(color="#111111", line_color="white", marker="triangle", size=10))
     layers.append(hv.Points(pins, label="pins").opts(color="#111111", line_color="white", marker="circle", size=7))
     return hv.Overlay(layers).opts(
-        hv.opts.Overlay(title="Front (looking at the board)", data_aspect=1, hooks=[equal_aspect], responsive=True,
+        hv.opts.Overlay(title="Front (looking at the board)", hooks=[equal_aspect], responsive=True,
                         min_height=height, xlabel="x (mm)", ylabel="y (mm)", legend_position="right",
                         show_grid=False, tools=["hover"], active_tools=["wheel_zoom"]))
 
@@ -121,7 +121,7 @@ def side_view(result: HolderResult, pb: PegboardParams, height: int = 520) -> hv
         zc = (z0 + z1) / 2
         z0, z1 = zc - want / 2, zc + want / 2
     return hv.Overlay(layers).opts(
-        hv.opts.Overlay(title=f"Side section at x = {xc:.0f} mm", data_aspect=1, hooks=[equal_aspect], responsive=True, min_height=height,
+        hv.opts.Overlay(title=f"Side section at x = {xc:.0f} mm", hooks=[equal_aspect], responsive=True, min_height=height,
                         xlabel="z, out of the board (mm)", ylabel="y (mm)", legend_position="right",
                         xlim=(z0, z1), ylim=(y0, y1)))
 
@@ -139,7 +139,7 @@ def top_view_plot(result: HolderResult, height: int = 520) -> hv.Overlay:
     layers.append(outline_path(result.outline).relabel("object").opts(color=OBJECT_COLOR, line_width=2,
                                                                        line_dash="dashed"))
     return hv.Overlay(layers).opts(
-        hv.opts.Overlay(title="Top (board along the bottom)", data_aspect=1, hooks=[equal_aspect], responsive=True, min_height=height,
+        hv.opts.Overlay(title="Top (board along the bottom)", hooks=[equal_aspect], responsive=True, min_height=height,
                         xlabel="x (mm)", ylabel="z, out of the board (mm)", legend_position="right"))
 
 

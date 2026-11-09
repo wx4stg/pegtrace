@@ -25,10 +25,11 @@ setTimeout(fit, 0);  // after a reset, the reset tool restores the ranges first
 def equal_aspect(plot, element) -> None:
     """HoloViews hook: keep 1:1 data aspect in a responsive plot.
 
-    HoloViews' ``data_aspect`` only adjusts responsive plots after a server round trip
-    reports the plot size, which never happens in a static page (and not reliably with
-    ``panel serve``), so wide windows stretched the image. This fits the ranges in the
-    browser instead.
+    Use it instead of HoloViews' ``data_aspect``. That only adjusts responsive plots after a
+    server round trip reports the plot size, which never happens in a static page, so wide
+    windows stretched the image; and it sizes the plot to the data's shape, so a tall holder
+    got a narrow plot with empty space around it. Here the plot fills its space and the
+    ranges are fitted in the browser.
     """
     fig = plot.state
     l, b, r, t = (float(v) for v in plot.get_extents(element, plot.current_ranges))
