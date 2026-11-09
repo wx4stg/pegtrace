@@ -38,14 +38,38 @@ def test_full_ui_flow(app):
     assert len(export._project().getvalue()) > 1000
 
 
-def test_lasso_and_edit(app):
+def test_point_draw_trace(app):
     state, steps = app.state, app.steps
     steps[0]._on_sample(None)
     steps[1]._on_apply(None)
-    steps[2]._on_lasso(np.array([[20, 20], [120, 25], [110, 200], [30, 190]], float))
+    trace = steps[2]
+    clicks = [(20, 20), (120, 25), (110, 200), (30, 190)]
+    xs, ys = [], []
+    for x, y in clicks:  # the browser sends all points after each click, the new one last
+        xs.append(x)
+        ys.append(y)
+        trace._on_draw({"x": list(xs), "y": list(ys)})
     assert state.outline is not None and state.outline.area > 10000
-    steps[2]._on_edit({"xs": [[20, 120, 110, 60]], "ys": [[20, 25, 200, 210]]})
-    assert abs(state.outline.bounds[3] - 210) < 1e-6
+    assert trace.verts == [(20.0, 20.0), (120.0, 25.0), (110.0, 200.0), (30.0, 190.0)]
+    # a click on the edge between vertices 1 and 2 splits it, wherever the browser put it
+    trace._on_draw({"x": xs + [115], "y": ys + [112]})
+    assert trace.verts[2] == (115.0, 112.0) and len(trace.verts) == 5
+    # drag the new vertex outward
+    v = list(trace.verts)
+    v[2] = (160.0, 112.0)
+    trace._on_draw({"x": [a for a, _ in v], "y": [b for _, b in v]})
+    assert abs(state.outline.bounds[2] - 160) < 1e-6
+    # delete it (Backspace), then undo the last point
+    del v[2]
+    trace._on_draw({"x": [a for a, _ in v], "y": [b for _, b in v]})
+    assert len(trace.verts) == 4 and state.outline.bounds[2] < 125
+    trace._on_undo(None)
+    assert len(trace.verts) == 3 and state.outline is not None
+    trace._on_undo(None)
+    assert state.outline is None
+    # outlines from auto-detect show up as editable vertices
+    trace._on_auto(None)
+    assert state.outline is not None and len(trace.verts) == len(state.outline.exterior.coords) - 1
 
 
 def test_corner_drag_updates_state(app):

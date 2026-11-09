@@ -1,4 +1,4 @@
-"""Step 3: trace the object outline (poly_select, vertex editing, auto-detect)."""
+"""Step 3: trace the object outline (click vertices, drag to edit, or auto-detect)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from shapely.geometry import Polygon
 
 from ..plotting import equal_aspect
 from ..state import AppState
-from ..tracing import outline_stats
+from ..tracing import insert_vertex, outline_stats
 from .common import FILL_WINDOW, display_array, help_text, show, status_alert
 
 
@@ -21,6 +21,9 @@ def cal_rgb(data) -> hv.RGB:
     return hv.RGB(display_array(cal.image, 1400), bounds=cal.bounds)
 
 
+VERTEX_OPTS = dict(color="#e15759", size=9, line_color="white", line_width=1.5)
+
+
 class TraceStep:
     title = "3 · Trace"
 
@@ -29,25 +32,44 @@ class TraceStep:
         self.on_done = on_done
         self.alert = status_alert()
         self._from_edit = False
+        self.verts: list[tuple[float, float]] = []  # outline vertices, in order
+        self.last = -1  # most recently added vertex: the next click continues from here
 
         self.auto = pn.widgets.Button(name="Auto-detect outline", button_type="default")
+        self.undo = pn.widgets.Button(name="Remove last point", button_type="default")
         self.clear = pn.widgets.Button(name="Clear", button_type="default")
         self.done = pn.widgets.Button(name="Use this outline", button_type="primary")
         self.simplify = pn.widgets.FloatSlider.from_param(state.param.simplify_tol, name="Smooth / simplify (mm)")
         self.stats = pn.pane.Markdown("No outline yet.", margin=(5, 10))
         self.auto.on_click(self._on_auto)
+        self.undo.on_click(self._on_undo)
         self.clear.on_click(lambda _: state.set_outline(None))
         self.done.on_click(self._on_done)
 
+        # Click to add vertices, drag to move them, select one and press Backspace to delete it.
+        self.vert_pipe = hv.streams.Pipe(data=[])
         self.poly_pipe = hv.streams.Pipe(data=[])
-        self.polys = hv.DynamicMap(lambda data: hv.Polygons(data), streams=[self.poly_pipe]).opts(
+        self.last_pipe = hv.streams.Pipe(data=[])
+        self.vertices = hv.DynamicMap(lambda data: hv.Points(data, ["x", "y"]), streams=[self.vert_pipe]).opts(
+            hv.opts.Points(**VERTEX_OPTS))
+        self.polys = hv.DynamicMap(lambda data: hv.Polygons([data] if len(data) else []),
+                                   streams=[self.poly_pipe]).opts(
             hv.opts.Polygons(fill_alpha=0.15, fill_color="#e15759", line_color="#e15759", line_width=2))
-        self.edit = hv.streams.PolyEdit(source=self.polys, vertex_style={"color": "#e15759", "size": 8},
-                                        shared=True, show_vertices=True)
-        self.edit.add_subscriber(self._on_edit)
-        self.lasso = None  # recreated with each image, see view()
+        self.last_marker = hv.DynamicMap(lambda data: hv.Points(data, ["x", "y"]), streams=[self.last_pipe]).opts(
+            hv.opts.Points(color=None, fill_alpha=0, line_color="#e15759", line_width=2, size=18))
+        self.draw = hv.streams.PointDraw(source=self.vertices, add=True, drag=True)
+        self.draw.add_subscriber(self._on_draw)
 
         state.param.watch(self._on_outline, "outline")
+
+    # -- display ----------------------------------------------------------------------
+    def _show_outline(self):
+        v = np.asarray(self.verts, float).reshape(-1, 2)
+        self.poly_pipe.send({"x": v[:, 0], "y": v[:, 1]} if len(v) >= 2 else [])
+        self.last_pipe.send(v[self.last:self.last + 1] if 0 <= self.last < len(v) else [])
+
+    def _send_vertices(self):
+        self.vert_pipe.send(list(self.verts))
 
     def _on_outline(self, event):
         p = event.new
@@ -57,33 +79,62 @@ class TraceStep:
         else:
             self.stats.object = (f"**Outline:** {st['width']:.1f} × {st['height']:.1f} mm, "
                                  f"area {st['area'] / 100:.1f} cm², {st['vertices']} vertices")
-        if self._from_edit:
+        if self._from_edit:  # the browser already shows these vertices
             return
-        if p is None:
-            self.poly_pipe.send([])
+        self.verts = [] if p is None else [tuple(c) for c in np.asarray(p.exterior.coords)[:-1]]
+        self.last = len(self.verts) - 1
+        self._send_vertices()
+        self._show_outline()
+
+    # -- editing ----------------------------------------------------------------------
+    def _snap(self) -> float:
+        """How close (mm) a click must be to an edge to split it rather than extend the outline."""
+        if len(self.verts) < 2:
+            return 0.0
+        v = np.asarray(self.verts)
+        return max(1.5, 0.025 * float(np.hypot(*(v.max(0) - v.min(0)))))
+
+    def _on_draw(self, data):
+        data = data or {}
+        new = [(float(x), float(y)) for x, y in zip(data.get("x", []), data.get("y", []))]
+        old = self.verts
+        if new == old:
+            return
+        if len(new) == len(old) + 1 and (not old or np.allclose(new[:-1], old)):
+            # a click: the browser appends the point; put it where it belongs
+            self.verts, self.last = insert_vertex(old, new[-1], self.last, self._snap())
+            if self.last != len(old):
+                self._send_vertices()  # keep the browser's order in step with ours
+        elif len(new) == len(old) - 1:
+            # Backspace on a selected vertex
+            k = next((i for i, (a, b) in enumerate(zip(new, old)) if a != b), len(new))
+            self.verts = new
+            self.last = k - 1 if k > 0 else len(new) - 1
         else:
-            c = np.asarray(p.exterior.coords)[:-1]
-            self.poly_pipe.send([{"x": c[:, 0], "y": c[:, 1]}])
+            self.verts = new  # dragged
+        self._show_outline()
+        self._commit()
 
-    def _on_lasso(self, geometry):
-        if geometry is None or len(geometry) < 3:
+    def _on_undo(self, _):
+        if not self.verts:
             return
-        self.state.set_outline(Polygon(np.asarray(geometry, float)))
-        show(self.alert, "Outline traced. Drag the red vertices to refine it.", "success")
+        i = self.last if 0 <= self.last < len(self.verts) else len(self.verts) - 1
+        del self.verts[i]
+        self.last = i - 1 if i > 0 else len(self.verts) - 1
+        self._send_vertices()
+        self._show_outline()
+        self._commit()
 
-    def _on_edit(self, data):
-        if not data or not data.get("xs"):
-            return
-        xs, ys = data["xs"][0], data["ys"][0]
-        if len(xs) < 3:
-            return
-        poly = Polygon(np.column_stack([xs, ys]))
-        cur = self.state.outline
-        if cur is not None and poly.symmetric_difference(cur).area < 1e-6:
-            return
+    def _commit(self):
+        """Hand the vertices to the app state as the outline (3 or more points)."""
         self._from_edit = True
         try:
-            self.state.simplify_tol = 0.0  # keep exactly what the user edited
+            if len(self.verts) < 3:
+                if self.state.raw_outline is not None:
+                    self.state.set_outline(None)
+                return
+            poly = Polygon(self.verts)
+            self.state.simplify_tol = 0.0  # keep exactly what the user placed
             self.state.set_outline(poly)
         finally:
             self._from_edit = False
@@ -95,9 +146,9 @@ class TraceStep:
             show(self.alert, str(e), "danger")
             return
         if ok:
-            show(self.alert, "Outline detected. Check it, and fix any vertices by dragging them.", "success")
+            show(self.alert, "Outline detected. Check it: drag vertices to fix them, click an edge to add one.", "success")
         else:
-            show(self.alert, "No object found; trace it by hand with the polygon tool.", "warning")
+            show(self.alert, "No object found; click around it to trace it by hand.", "warning")
 
     def _on_done(self, _):
         if self.state.outline is None:
@@ -109,22 +160,21 @@ class TraceStep:
     def view(self):
         controls = pn.Column(
             "### Trace the object",
-            help_text("Use the **polygon select** tool: click around the object's outline, then press "
-                      "**Enter** (or press and hold the mouse) to close it. Or press *Auto-detect*. "
-                      "Then drag the red vertices to fine-tune. Include everything that sticks out."),
-            pn.Row(self.auto, self.clear), self.simplify, self.stats, self.done, self.alert,
+            help_text("**Click** around the object's outline to place vertices; the outline closes "
+                      "itself. **Drag** a vertex to move it. Click **on an edge** to add a vertex there. "
+                      "To delete one, click it and press **Backspace** (or use *Remove last point*). "
+                      "*Auto-detect* finds the outline for you. Include everything that sticks out."),
+            pn.Row(self.auto, self.undo), self.clear, self.simplify, self.stats, self.done, self.alert,
             width=340,
         )
         # A fresh plot per calibration: with data_aspect + responsive, HoloViews does not
         # update the axis ranges of an existing plot, so streamed images would be cropped.
         @pn.depends(self.state.param.calibration)
         def plot(cal):
-            rgb = cal_rgb(cal).opts(tools=["poly_select"], default_tools=["pan", "wheel_zoom", "reset"])
-            self.lasso = hv.streams.Lasso(source=rgb)
-            self.lasso.add_subscriber(self._on_lasso)
-            return (rgb * self.polys).opts(
-                hv.opts.Overlay(data_aspect=1, hooks=[equal_aspect], responsive=True, min_height=600, xlabel="x (mm)", ylabel="y (mm)",
-                                active_tools=["poly_select"]))
+            rgb = cal_rgb(cal).opts(default_tools=["pan", "wheel_zoom", "reset"])
+            return (rgb * self.polys * self.last_marker * self.vertices).opts(
+                hv.opts.Overlay(data_aspect=1, hooks=[equal_aspect], responsive=True, min_height=600,
+                                xlabel="x (mm)", ylabel="y (mm)", active_tools=["point_draw"]))
 
         return pn.Row(controls, pn.pane.HoloViews(plot, sizing_mode="stretch_both", min_height=600,
                                                   linked_axes=False),

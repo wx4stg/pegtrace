@@ -187,15 +187,16 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
 
         rng = page.evaluate("""() => {
           const all = Bokeh.documents.flatMap(d => [...d.all_models]);
-          // newest poly_select plot (replaced plots can linger in all_models)
-          const p = all.filter(m => m.toolbar && m.toolbar.tools.some(t => (t.type||t.constructor.name) === 'PolySelectTool')).pop();
+          // newest plot with an x axis label in mm (replaced plots can linger in all_models)
+          const p = all.filter(m => m.toolbar && m.toolbar.tools.some(t => (t.type||t.constructor.name) === 'PointDrawTool')
+                                  && m.below && m.below.some(a => a.axis_label === 'x (mm)')).pop();
           return p ? [p.x_range.start, p.x_range.end, p.y_range.start, p.y_range.end] : null;
         }""")
         r.check(rng is not None and rng[0] < 0 and rng[1] > 200 and rng[2] < 0 and rng[3] > 250,
                 f"trace plot shows the whole calibrated image (ranges {rng})")
-        print("step 3: trace by hand with poly_select")
+        print("step 3: trace by hand with point draw")
 
-        r.step = "step 3: trace by hand with poly_select"
+        r.step = "step 3: trace by hand with point draw"
         box = r.visible_canvas()
         r.check(box is not None, "trace plot canvas visible")
         cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
@@ -203,12 +204,30 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
         for dx, dy in pts:
             page.mouse.click(cx + dx, cy + dy)
             page.wait_for_timeout(450)  # faster taps register as double-taps
-        page.keyboard.press("Enter")  # bokeh 3 finishes poly_select with Enter or press-and-hold
-        page.wait_for_timeout(1000)
-        r.shot("after_hand_trace_clicks")
-        r.wait_text("Outline:", timeout=20_000)
-        r.check(True, "hand-drawn polygon reached Python")
+        r.wait_text("4 vertices", timeout=20_000)
+        r.check(True, "clicked polygon reached Python")
         r.shot("hand_trace")
+        # click on the middle of the second edge to split it, then drag the new vertex outward
+        mx, my = cx + (pts[1][0] + pts[2][0]) / 2, cy + (pts[1][1] + pts[2][1]) / 2
+        page.mouse.click(mx, my)
+        r.wait_text("5 vertices", timeout=20_000)
+        page.wait_for_timeout(600)
+        page.mouse.move(mx, my)
+        page.mouse.down()
+        page.mouse.move(mx + 40, my, steps=8)
+        page.mouse.up()
+        page.wait_for_timeout(1500)
+        verts = page.evaluate("""() => {
+          const all = Bokeh.documents.flatMap(d => [...d.all_models]);
+          const t = all.filter(m => (m.type||m.constructor.name) === 'PointDrawTool').pop();
+          const src = t.renderers[0].data_source;
+          return [src.data.x.length, Math.max(...src.data.x)];
+        }""")
+        r.check(verts[0] == 5, f"split edge kept 5 vertices in the browser ({verts})")
+        r.shot("hand_trace_edited")
+        r.click("Remove last point")
+        r.wait_text("4 vertices", timeout=20_000)
+        r.check(True, "removed the last point")
         r.click("Auto-detect outline")
         r.wait_text("Outline detected")
         page.wait_for_timeout(1500)

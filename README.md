@@ -22,11 +22,11 @@ locally with `panel serve`, or as a **fully static web page** with Python runnin
      perspective-corrected, so the camera doesn't need to be exactly overhead.
    - *Two points*: mark two ruler marks a known distance apart. This gives scale only, with no perspective
      correction.
-3. **Trace**: three ways to get the outline.
-   - Use the **polygon select** tool: click around the object, then press **Enter** (or press and hold) to
-     close the polygon.
-   - Or press **Auto-detect**.
-   - Drag the red vertices to refine the outline. A slider smooths or simplifies it.
+3. **Trace**: click around the object, or press **Auto-detect**.
+   - Each click adds a vertex, and the outline closes itself.
+   - Drag a vertex to move it. Click on an edge to add a vertex there.
+   - To delete a vertex, click it and press **Backspace**, or use *Remove last point*.
+   - A slider smooths or simplifies the outline.
 4. **Orientation**: pick the mount style, then set the arrow.
    - **Flat**: the object hangs against the board in a cradle. The arrow points *down*.
    - **Shelf**: the outline becomes a pocket in a shelf that sticks out from the board. The arrow points
@@ -125,7 +125,7 @@ Notes on the browser runtime:
 
 The end-to-end test drives every step with real clicks:
 - loads the sample photo and calibrates;
-- draws a polygon by hand, then auto-detects the outline;
+- clicks an outline by hand, splits an edge and drags a vertex, then auto-detects the outline;
 - picks an orientation and checks the views, including Shelf mode;
 - downloads the STL;
 - saves the project and loads it back;

@@ -40,3 +40,20 @@ def test_orient_puts_chosen_direction_down(angle):
 def test_auto_down_angle_puts_heavy_end_down(hammer):
     o = orient_polygon(hammer, auto_down_angle(hammer))
     assert o.centroid.y < (o.bounds[3] - o.bounds[1]) / 2
+
+
+def test_insert_vertex_extends_or_splits():
+    from pegtrace.tracing import insert_vertex
+
+    sq = [(0, 0), (100, 0), (100, 100)]
+    # far from every edge: continues after the last added vertex
+    v, i = insert_vertex(sq, (-10, 150), after=2, snap=2)
+    assert i == 3 and v[3] == (-10.0, 150.0)
+    v, i = insert_vertex(sq, (-10, 150), after=0, snap=2)
+    assert i == 1
+    # on an edge: splits it
+    v, i = insert_vertex(sq, (100.5, 50), after=0, snap=2)
+    assert i == 2 and v == [(0, 0), (100, 0), (100.5, 50), (100, 100)]
+    # the first points just append
+    assert insert_vertex([], (1, 2), after=-1, snap=0) == ([(1.0, 2.0)], 0)
+    assert insert_vertex([(0, 0)], (5, 5), after=0, snap=0)[1] == 1
