@@ -11,6 +11,8 @@ from PIL import Image
 from shapely.geometry import LineString, Polygon
 
 DISPLAY_PX = 1200
+# Rows holding a big plot fill the window below the header and step tabs (min heights still apply).
+FILL_WINDOW = {"height": "calc(100vh - 100px)"}
 
 # Bokeh's tab headers hard-code dark text on the active tab; follow the Panel theme instead.
 TABS_CSS = """

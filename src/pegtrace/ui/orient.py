@@ -7,9 +7,10 @@ import panel as pn
 
 from ..geom2d import rect
 from ..preview import OBJECT_COLOR, polys_data
+from ..plotting import equal_aspect
 from ..state import AppState
 from ..tracing import orient_polygon
-from .common import arrow, help_text
+from .common import FILL_WINDOW, arrow, help_text
 
 MODE_LABELS = {"Flat against the board": "flat", "Shelf (top-down footprint)": "shelf"}
 
@@ -56,7 +57,7 @@ class OrientStep:
             label = "down" if mode == "flat" else "toward the board"
             return (hv.Polygons(polys_data(outline)).opts(color=OBJECT_COLOR, alpha=0.35, line_color=OBJECT_COLOR)
                     * hv.Polygons(polys_data(arr)).opts(color="#e15759", line_alpha=0)
-                    ).opts(title=f"In the photo: arrow = {label}", data_aspect=1, responsive=True, min_height=420,
+                    ).opts(title=f"In the photo: arrow = {label}", data_aspect=1, hooks=[equal_aspect], responsive=True, min_height=420,
                            xlabel="x (mm)", ylabel="y (mm)")
 
         @pn.depends(state.param.outline, state.param.direction, state.param.mode)
@@ -79,7 +80,7 @@ class OrientStep:
             return (hv.Polygons(polys_data(board)).opts(color="#c8a97e", line_alpha=0)
                     * hv.Polygons(polys_data(o)).opts(color=OBJECT_COLOR, alpha=0.35, line_color=OBJECT_COLOR)
                     * hv.Polygons(polys_data(arr)).opts(color="#888888", line_alpha=0) * note
-                    ).opts(title=title, data_aspect=1, responsive=True, min_height=420, xlabel=xl, ylabel=yl)
+                    ).opts(title=title, data_aspect=1, hooks=[equal_aspect], responsive=True, min_height=420, xlabel=xl, ylabel=yl)
 
         controls = pn.Column(
             "### Mount style",
@@ -96,4 +97,4 @@ class OrientStep:
         return pn.Row(controls,
                       pn.Row(pn.pane.HoloViews(photo_view, sizing_mode="stretch_both", linked_axes=False),
                              pn.pane.HoloViews(frame_view, sizing_mode="stretch_both", linked_axes=False), sizing_mode="stretch_both"),
-                      sizing_mode="stretch_width")
+                      sizing_mode="stretch_width", styles=FILL_WINDOW)

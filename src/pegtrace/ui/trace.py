@@ -7,9 +7,10 @@ import numpy as np
 import panel as pn
 from shapely.geometry import Polygon
 
+from ..plotting import equal_aspect
 from ..state import AppState
 from ..tracing import outline_stats
-from .common import display_array, help_text, show, status_alert
+from .common import FILL_WINDOW, display_array, help_text, show, status_alert
 
 
 def cal_rgb(data) -> hv.RGB:
@@ -122,9 +123,9 @@ class TraceStep:
             self.lasso = hv.streams.Lasso(source=rgb)
             self.lasso.add_subscriber(self._on_lasso)
             return (rgb * self.polys).opts(
-                hv.opts.Overlay(data_aspect=1, responsive=True, min_height=600, xlabel="x (mm)", ylabel="y (mm)",
+                hv.opts.Overlay(data_aspect=1, hooks=[equal_aspect], responsive=True, min_height=600, xlabel="x (mm)", ylabel="y (mm)",
                                 active_tools=["poly_select"]))
 
         return pn.Row(controls, pn.pane.HoloViews(plot, sizing_mode="stretch_both", min_height=600,
                                                   linked_axes=False),
-                      sizing_mode="stretch_width")
+                      sizing_mode="stretch_width", styles=FILL_WINDOW)

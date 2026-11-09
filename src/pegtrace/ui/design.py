@@ -8,7 +8,7 @@ import panel as pn
 from ..preview import front_view, scene_archive, side_view, top_view_plot
 from ..state import AppState
 from ..vtkjs import scene_pane
-from .common import TABS_CSS, help_text, show, status_alert
+from .common import FILL_WINDOW, TABS_CSS, help_text, show, status_alert
 
 PEG_FIELDS = ["preset", "spacing", "hole_d", "board_t", "peg_clear", "board_clear", "hook_rise", "columns",
               "max_pegs", "stride", "add_pins", "pin_rows", "pin_length", "peg_profile", "tab_margin"]
@@ -152,6 +152,6 @@ class DesignStep:
             active=[0, 1], sizing_mode="stretch_width",
         )
         controls = pn.Column("### Holder settings", settings, self.alert, self.next, width=360,
-                             scroll=True, max_height=1100)
+                             scroll=True, sizing_mode="stretch_height")
         return pn.Row(controls, pn.Column(pn.panel(summary), views, sizing_mode="stretch_both"),
-                      sizing_mode="stretch_width")
+                      sizing_mode="stretch_width", styles=FILL_WINDOW)

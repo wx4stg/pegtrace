@@ -6,8 +6,9 @@ import holoviews as hv
 import panel as pn
 
 from ..sample import make_photo
+from ..plotting import equal_aspect
 from ..state import AppState
-from .common import help_text, photo_rgb, show, status_alert
+from .common import FILL_WINDOW, help_text, photo_rgb, show, status_alert
 
 
 class LoadStep:
@@ -53,8 +54,8 @@ class LoadStep:
         )
         @pn.depends(self.state.param.photo)
         def image(photo):
-            return photo_rgb(photo).opts(data_aspect=1, responsive=True, min_height=500, xaxis=None, yaxis=None,
+            return photo_rgb(photo).opts(data_aspect=1, hooks=[equal_aspect], responsive=True, min_height=500, xaxis=None, yaxis=None,
                                          default_tools=["pan", "wheel_zoom", "reset"], active_tools=["wheel_zoom"])
 
         return pn.Row(controls, pn.pane.HoloViews(image, sizing_mode="stretch_both", min_height=500, linked_axes=False),
-                      sizing_mode="stretch_width")
+                      sizing_mode="stretch_width", styles=FILL_WINDOW)
