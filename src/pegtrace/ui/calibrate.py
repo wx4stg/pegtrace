@@ -7,11 +7,9 @@ import numpy as np
 import panel as pn
 
 from ..calibration import order_corners
-from ..plotting import equal_aspect
+from ..plotting import equal_aspect, fast_taps
 from ..state import CUSTOM, RECT, RULER, AppState
-from .common import FILL_WINDOW, help_text, photo_rgb, show, status_alert
-
-POINT_OPTS = dict(color="#e15759", size=12, line_color="white", line_width=2)
+from .common import FILL_WINDOW, OUTLINE_OPTS, POINT_OPTS, help_text, photo_rgb, show, status_alert
 
 
 class CalibrateStep:
@@ -42,8 +40,7 @@ class CalibrateStep:
         ruler = hv.DynamicMap(lambda data: hv.Points(data, ["x", "y"]), streams=[self.ruler_pipe]).opts(
             hv.opts.Points(**{**POINT_OPTS, "color": "#4e79a7"}))
         quad = hv.DynamicMap(lambda data: hv.Path([data]) if len(data) > 1 else hv.Path([]),
-                             streams=[self.quad_pipe]).opts(hv.opts.Path(color="#e15759", line_width=2,
-                                                                         line_dash="dashed"))
+                             streams=[self.quad_pipe]).opts(hv.opts.Path(**OUTLINE_OPTS))
         self.corner_draw = hv.streams.PointDraw(source=corners, num_objects=4, add=True, drag=True)
         self.ruler_draw = hv.streams.PointDraw(source=ruler, num_objects=2, add=True, drag=True)
         self.corner_draw.add_subscriber(self._on_corner_draw)
@@ -140,7 +137,7 @@ class CalibrateStep:
         def plot(method, photo):
             layer = self.corners_layer if method == RECT else self.ruler_layer
             obj = (photo_rgb(photo).opts(default_tools=["pan", "wheel_zoom", "reset"]) * layer).opts(
-                hv.opts.Overlay(data_aspect=1, hooks=[equal_aspect], responsive=True, min_height=560, xaxis=None, yaxis=None,
+                hv.opts.Overlay(data_aspect=1, hooks=[equal_aspect, fast_taps], responsive=True, min_height=560, xaxis=None, yaxis=None,
                                 active_tools=["point_draw"]))
             return pn.pane.HoloViews(obj, sizing_mode="stretch_both", min_height=560, linked_axes=False)
 

@@ -203,7 +203,7 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
         pts = [(-60, -80), (70, -70), (80, 60), (-50, 90)]
         for dx, dy in pts:
             page.mouse.click(cx + dx, cy + dy)
-            page.wait_for_timeout(450)  # faster taps register as double-taps
+            page.wait_for_timeout(150)  # quick clicks: bokeh reports them as double taps (see fast_taps)
         r.wait_text("4 vertices", timeout=20_000)
         r.check(True, "clicked polygon reached Python")
         r.shot("hand_trace")

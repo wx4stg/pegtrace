@@ -59,6 +59,44 @@ def insert_vertex(verts, p, after: int, snap: float) -> tuple[list, int]:
     return verts, idx
 
 
+def merge_close_vertices(poly: Polygon, min_edge: float) -> Polygon:
+    """Merge vertices closer than ``min_edge`` (e.g. the 2-3 points a rounded corner
+    leaves), so each corner is one point that is easy to grab.
+
+    A short edge is replaced by the point where its neighbouring edges meet, so a
+    rounded corner becomes the sharp corner around it. Short edges whose neighbours
+    don't meet nearby (the end of a narrow tab) are kept.
+    """
+    if poly.is_empty or min_edge <= 0:
+        return poly
+    v = [np.asarray(c, float) for c in np.asarray(poly.exterior.coords)[:-1]]
+    keep: set[tuple] = set()  # short edges that can't be merged, by their end points
+    while len(v) > 3:
+        n = len(v)
+        cands = [(float(np.hypot(*(v[(i + 1) % n] - v[i]))), i) for i in range(n)]
+        cands = [(d, i) for d, i in cands if d < min_edge
+                 and (tuple(v[i]), tuple(v[(i + 1) % n])) not in keep]
+        if not cands:
+            break
+        _, i = min(cands)
+        p0, p1, p2, p3 = v[(i - 1) % n], v[i], v[(i + 1) % n], v[(i + 2) % n]
+        d1, d2 = p1 - p0, p3 - p2
+        den = d1[0] * d2[1] - d1[1] * d2[0]
+        x = None
+        if abs(den) > 1e-9:
+            t = ((p2 - p0)[0] * d2[1] - (p2 - p0)[1] * d2[0]) / den
+            x = p0 + t * d1
+        if x is None or np.hypot(*(x - (p1 + p2) / 2)) > min_edge:
+            keep.add((tuple(p1), tuple(p2)))
+            continue
+        j = (i + 1) % n
+        v = [x if k == i else c for k, c in enumerate(v) if k != j]
+    out = Polygon(v)
+    if not out.is_valid or abs(out.area - poly.area) > 0.05 * poly.area:
+        return poly
+    return shapely.geometry.polygon.orient(out, 1.0)
+
+
 def outline_stats(poly: Polygon) -> dict:
     if poly is None or poly.is_empty:
         return {"width": 0.0, "height": 0.0, "area": 0.0, "vertices": 0}
@@ -155,7 +193,8 @@ def autodetect(
             best = p
     if best.area < min_area_mm2:
         return Polygon()
-    return prepare_outline(best, simplify_tol=0.5 / max(ppm, 1e-6) + 0.2)
+    p = prepare_outline(best, simplify_tol=0.5 / max(ppm, 1e-6) + 0.2)
+    return merge_close_vertices(p, min(6.0, 0.04 * math.hypot(p.bounds[2] - p.bounds[0], p.bounds[3] - p.bounds[1])))
 
 
 # ----------------------------------------------------------------- orientation

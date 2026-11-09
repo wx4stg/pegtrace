@@ -46,3 +46,22 @@ def equal_aspect(plot, element) -> None:
         bx, by = holders
         bx.update(start=l, end=r)
         by.update(start=b, end=t)
+
+
+# Bokeh turns a second tap within 300 ms into a "doubletap", which PointDrawTool ignores, so
+# clicking points at a normal pace silently dropped every other one. Treat it as a tap.
+_FAST_TAPS_JS = """
+if (!globalThis.__pegtrace_fast_taps) {
+  const mod = Bokeh.require("models/tools/edit/point_draw_tool");
+  mod.PointDrawToolView.prototype._doubletap = function (ev) { this._tap(ev); };
+  globalThis.__pegtrace_fast_taps = true;
+}
+"""
+
+
+def fast_taps(plot, element) -> None:
+    """HoloViews hook for plots with a PointDraw stream: every click adds a point."""
+    if getattr(plot, "_fast_taps", False):
+        return
+    plot.state.js_on_change("inner_width", CustomJS(code=_FAST_TAPS_JS))
+    plot._fast_taps = True

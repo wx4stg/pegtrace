@@ -57,3 +57,25 @@ def test_insert_vertex_extends_or_splits():
     # the first points just append
     assert insert_vertex([], (1, 2), after=-1, snap=0) == ([(1.0, 2.0)], 0)
     assert insert_vertex([(0, 0)], (5, 5), after=0, snap=0)[1] == 1
+
+
+def test_merge_close_vertices_makes_sharp_corners():
+    from shapely.geometry import box
+
+    from pegtrace.tracing import merge_close_vertices
+
+    rounded = box(0, 0, 40, 20).buffer(-2).buffer(2, quad_segs=1)  # 2 points per corner
+    merged = merge_close_vertices(rounded, 3.0)
+    assert len(merged.exterior.coords) - 1 == 4
+    assert merged.contains(rounded.buffer(-1e-6))  # only grows
+    assert merged.area == pytest.approx(800, rel=0.01)
+
+
+def test_merge_close_vertices_keeps_narrow_tabs():
+    from shapely.geometry import box
+
+    from pegtrace.tracing import merge_close_vertices
+
+    tab = box(0, 0, 60, 20).union(box(28, 20, 32, 50))  # a 4 mm wide tab sticking up
+    merged = merge_close_vertices(tab, 5.0)
+    assert merged.equals(tab.normalize()) or abs(merged.area - tab.area) < 1e-6

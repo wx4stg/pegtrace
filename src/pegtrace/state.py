@@ -46,7 +46,7 @@ class AppState(param.Parameterized):
 
     # step 3: outline (mm, calibrated frame)
     raw_outline = param.Parameter(default=None)
-    simplify_tol = param.Number(default=0.3, bounds=(0, 5), step=0.05)
+    simplify_tol = param.Number(default=0.5, bounds=(0, 5), step=0.05)
     outline = param.Parameter(default=None)
 
     # step 4: orientation
@@ -127,9 +127,12 @@ class AppState(param.Parameterized):
         return cal
 
     # ------------------------------------------------------------ outline
-    def set_outline(self, poly: Polygon | None) -> None:
+    def set_outline(self, poly: Polygon | None, simplify: bool = True) -> None:
+        """Set the traced outline. ``simplify=False`` (points placed by hand) keeps every
+        point; the smoothing slider still applies when it is moved."""
         if poly is not None and not poly.is_empty:
             poly = prepare_outline(poly)
+        self._simplify_raw = simplify
         self.raw_outline = poly if poly is not None and not poly.is_empty else None
 
     def autodetect(self) -> bool:
@@ -141,12 +144,19 @@ class AppState(param.Parameterized):
         self.set_outline(p)
         return True
 
-    @param.depends("raw_outline", "simplify_tol", watch=True)
+    @param.depends("raw_outline", watch=True)
     def _update_outline(self):
+        self._apply_simplify(self.simplify_tol if getattr(self, "_simplify_raw", True) else 0.0)
+
+    @param.depends("simplify_tol", watch=True)
+    def _on_simplify(self):
+        self._apply_simplify(self.simplify_tol)
+
+    def _apply_simplify(self, tol: float):
         if self.raw_outline is None:
             self.outline = None
         else:
-            p = prepare_outline(self.raw_outline, self.simplify_tol)
+            p = prepare_outline(self.raw_outline, tol)
             self.outline = p if not p.is_empty else None
 
     def auto_direction(self) -> None:
@@ -281,7 +291,7 @@ class AppState(param.Parameterized):
         )
         if doc.get("calibrated") and self.photo is not None:
             self.calibrate()
-        self.param.update(simplify_tol=doc.get("simplify_tol", 0.3), mode=doc.get("mode", "flat"),
+        self.param.update(simplify_tol=doc.get("simplify_tol", 0.5), mode=doc.get("mode", "flat"),
                           direction=doc.get("direction", 270.0))
         if doc.get("outline_mm"):
             self.set_outline(Polygon(doc["outline_mm"]))

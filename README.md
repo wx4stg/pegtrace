@@ -22,11 +22,13 @@ locally with `panel serve`, or as a **fully static web page** with Python runnin
      perspective-corrected, so the camera doesn't need to be exactly overhead.
    - *Two points*: mark two ruler marks a known distance apart. This gives scale only, with no perspective
      correction.
-3. **Trace**: click around the object, or press **Auto-detect**.
-   - Each click adds a vertex, and the outline closes itself.
-   - Drag a vertex to move it. Click on an edge to add a vertex there.
-   - To delete a vertex, click it and press **Backspace**, or use *Remove last point*.
-   - A slider smooths or simplifies the outline.
+3. **Trace**: the same point tools as the Scale step, plus adding points. Click around the object, or press
+   **Auto-detect**.
+   - Each click adds a point, and the dashed outline closes itself.
+   - Drag a point to move it. Click on the dashed line to add a point there.
+   - To delete a point, click it and press **Backspace**, or use *Remove last point*.
+   - Auto-detect merges the points of rounded corners into one point each. A slider smooths or simplifies
+     the outline. Points you place by hand are kept exactly.
 4. **Orientation**: pick the mount style, then set the arrow.
    - **Flat**: the object hangs against the board, in a pocket-style cradle or (Design step) a ring
      around a narrow part. The arrow points *down*.

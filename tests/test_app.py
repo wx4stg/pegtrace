@@ -54,6 +54,7 @@ def test_point_draw_trace(app):
     # a click on the edge between vertices 1 and 2 splits it, wherever the browser put it
     trace._on_draw({"x": xs + [115], "y": ys + [112]})
     assert trace.verts[2] == (115.0, 112.0) and len(trace.verts) == 5
+    assert len(state.outline.exterior.coords) - 1 == 5  # hand-placed points are not simplified away
     # drag the new vertex outward
     v = list(trace.verts)
     v[2] = (160.0, 112.0)
@@ -67,6 +68,11 @@ def test_point_draw_trace(app):
     assert len(trace.verts) == 3 and state.outline is not None
     trace._on_undo(None)
     assert state.outline is None
+    # Clear removes points even when there are too few for an outline
+    trace._on_draw({"x": [10, 50], "y": [10, 10]})
+    assert len(trace.verts) == 2 and state.outline is None
+    trace._on_clear(None)
+    assert trace.verts == [] and trace.vert_pipe.data == []
     # outlines from auto-detect show up as editable vertices
     trace._on_auto(None)
     assert state.outline is not None and len(trace.verts) == len(state.outline.exterior.coords) - 1

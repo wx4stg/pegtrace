@@ -7,10 +7,10 @@ import numpy as np
 import panel as pn
 from shapely.geometry import Polygon
 
-from ..plotting import equal_aspect
+from ..plotting import equal_aspect, fast_taps
 from ..state import AppState
 from ..tracing import insert_vertex, outline_stats
-from .common import FILL_WINDOW, display_array, help_text, show, status_alert
+from .common import FILL_WINDOW, OUTLINE_OPTS, POINT_OPTS, display_array, help_text, show, status_alert
 
 
 def cal_rgb(data) -> hv.RGB:
@@ -19,9 +19,6 @@ def cal_rgb(data) -> hv.RGB:
     if cal is None:
         return hv.RGB(np.full((2, 2, 3), 240, np.uint8), bounds=(0, 0, 1, 1))
     return hv.RGB(display_array(cal.image, 1400), bounds=cal.bounds)
-
-
-VERTEX_OPTS = dict(color="#e15759", size=9, line_color="white", line_width=1.5)
 
 
 class TraceStep:
@@ -43,20 +40,17 @@ class TraceStep:
         self.stats = pn.pane.Markdown("No outline yet.", margin=(5, 10))
         self.auto.on_click(self._on_auto)
         self.undo.on_click(self._on_undo)
-        self.clear.on_click(lambda _: state.set_outline(None))
+        self.clear.on_click(self._on_clear)
         self.done.on_click(self._on_done)
 
-        # Click to add vertices, drag to move them, select one and press Backspace to delete it.
+        # Same tools as the scale step (drag points, dashed outline), plus adding points:
+        # click to add, drag to move, select and press Backspace to delete.
         self.vert_pipe = hv.streams.Pipe(data=[])
-        self.poly_pipe = hv.streams.Pipe(data=[])
-        self.last_pipe = hv.streams.Pipe(data=[])
+        self.path_pipe = hv.streams.Pipe(data=[])
         self.vertices = hv.DynamicMap(lambda data: hv.Points(data, ["x", "y"]), streams=[self.vert_pipe]).opts(
-            hv.opts.Points(**VERTEX_OPTS))
-        self.polys = hv.DynamicMap(lambda data: hv.Polygons([data] if len(data) else []),
-                                   streams=[self.poly_pipe]).opts(
-            hv.opts.Polygons(fill_alpha=0.15, fill_color="#e15759", line_color="#e15759", line_width=2))
-        self.last_marker = hv.DynamicMap(lambda data: hv.Points(data, ["x", "y"]), streams=[self.last_pipe]).opts(
-            hv.opts.Points(color=None, fill_alpha=0, line_color="#e15759", line_width=2, size=18))
+            hv.opts.Points(**POINT_OPTS))
+        self.path = hv.DynamicMap(lambda data: hv.Path([data]) if len(data) > 1 else hv.Path([]),
+                                  streams=[self.path_pipe]).opts(hv.opts.Path(**OUTLINE_OPTS))
         self.draw = hv.streams.PointDraw(source=self.vertices, add=True, drag=True)
         self.draw.add_subscriber(self._on_draw)
 
@@ -64,9 +58,11 @@ class TraceStep:
 
     # -- display ----------------------------------------------------------------------
     def _show_outline(self):
+        """Dashed outline through the vertices, closed once there are three."""
         v = np.asarray(self.verts, float).reshape(-1, 2)
-        self.poly_pipe.send({"x": v[:, 0], "y": v[:, 1]} if len(v) >= 2 else [])
-        self.last_pipe.send(v[self.last:self.last + 1] if 0 <= self.last < len(v) else [])
+        if len(v) >= 3:
+            v = np.vstack([v, v[:1]])
+        self.path_pipe.send(v if len(v) >= 2 else [])
 
     def _send_vertices(self):
         self.vert_pipe.send(list(self.verts))
@@ -115,6 +111,12 @@ class TraceStep:
         self._show_outline()
         self._commit()
 
+    def _on_clear(self, _):
+        self.verts, self.last = [], -1
+        self._send_vertices()
+        self._show_outline()
+        self._commit()
+
     def _on_undo(self, _):
         if not self.verts:
             return
@@ -133,9 +135,7 @@ class TraceStep:
                 if self.state.raw_outline is not None:
                     self.state.set_outline(None)
                 return
-            poly = Polygon(self.verts)
-            self.state.simplify_tol = 0.0  # keep exactly what the user placed
-            self.state.set_outline(poly)
+            self.state.set_outline(Polygon(self.verts), simplify=False)
         finally:
             self._from_edit = False
 
@@ -160,10 +160,10 @@ class TraceStep:
     def view(self):
         controls = pn.Column(
             "### Trace the object",
-            help_text("**Click** around the object's outline to place vertices; the outline closes "
-                      "itself. **Drag** a vertex to move it. Click **on an edge** to add a vertex there. "
-                      "To delete one, click it and press **Backspace** (or use *Remove last point*). "
-                      "*Auto-detect* finds the outline for you. Include everything that sticks out."),
+            help_text("Like the scale step: **drag** the red points. **Click** to add a point: around the "
+                      "object to draw its outline (it closes itself), or **on the dashed line** to add one "
+                      "there. To delete a point, click it and press **Backspace**, or use *Remove last "
+                      "point*. *Auto-detect* finds the outline for you. Include everything that sticks out."),
             pn.Row(self.auto, self.undo), self.clear, self.simplify, self.stats, self.done, self.alert,
             width=340,
         )
@@ -172,8 +172,8 @@ class TraceStep:
         @pn.depends(self.state.param.calibration)
         def plot(cal):
             rgb = cal_rgb(cal).opts(default_tools=["pan", "wheel_zoom", "reset"])
-            return (rgb * self.polys * self.last_marker * self.vertices).opts(
-                hv.opts.Overlay(data_aspect=1, hooks=[equal_aspect], responsive=True, min_height=600,
+            return (rgb * self.path * self.vertices).opts(
+                hv.opts.Overlay(data_aspect=1, hooks=[equal_aspect, fast_taps], responsive=True, min_height=600,
                                 xlabel="x (mm)", ylabel="y (mm)", active_tools=["point_draw"]))
 
         return pn.Row(controls, pn.pane.HoloViews(plot, sizing_mode="stretch_both", min_height=600,
