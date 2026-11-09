@@ -8,7 +8,7 @@ import panel as pn
 from ..preview import front_view, scene_archive, side_view, top_view_plot
 from ..state import AppState
 from ..vtkjs import scene_pane
-from .common import help_text, show, status_alert
+from .common import TABS_CSS, help_text, show, status_alert
 
 PEG_FIELDS = ["preset", "spacing", "hole_d", "board_t", "peg_clear", "board_clear", "hook_rise", "columns",
               "max_pegs", "stride", "add_pins", "pin_rows", "pin_length", "peg_profile", "tab_margin"]
@@ -75,7 +75,7 @@ class DesignStep:
             self.scene_box.objects = []
             return
         archive = scene_archive(r, self.state.pegboard, show_board=self.show_board.value,
-                                show_object=self.show_object.value)
+                                show_object=self.show_object.value, dark=self.state.theme == "dark")
         self.scene = scene_pane(archive, sizing_mode="stretch_both", min_height=560, orientation_widget=True,
                                 enable_keybindings=True)
         self.scene_box.objects = [self.scene]
@@ -142,7 +142,7 @@ class DesignStep:
             ("Top", pn.pane.HoloViews(top, sizing_mode="stretch_both", min_height=560, linked_axes=False)),
             ("3D", pn.Column(pn.Row(self.live3d, self.show_board, self.show_object, self.refresh),
                              self.scene_box, sizing_mode="stretch_both")),
-            sizing_mode="stretch_both", dynamic=False,
+            sizing_mode="stretch_both", dynamic=False, stylesheets=[TABS_CSS],
         )
         views.param.watch(lambda e: self._update_3d(force=True) if e.new == self.TAB_3D and self._dirty_3d
                           else None, "active")

@@ -11,9 +11,18 @@
   <script src="https://cdn.holoviz.org/panel/{PANEL}/dist/panel.min.js"></script>
 {EXTRA_HEAD}
   <script src="pyjs_runtime_browser.js"></script>
+  <script>
+    // Theme: ?theme=dark|default, else the last choice, else light. Python reads data-theme.
+    (() => {
+      let t = new URLSearchParams(location.search).get("theme");
+      if (!t) { try { t = localStorage.getItem("pegtrace-theme"); } catch (e) {} }
+      document.documentElement.dataset.theme = t === "dark" ? "dark" : "default";
+    })();
+  </script>
   <style>
-    :root { --bg: #ffffff; --fg: #1f2933; --muted: #52606d; --accent: #2f6fde; }
-    @media (prefers-color-scheme: dark) { :root { --bg: #111418; --fg: #e4e7eb; --muted: #9aa5b1; } }
+    /* match Panel's --panel-background-color for each theme */
+    :root { color-scheme: light; --bg: #ffffff; --fg: #212529; --muted: #6c757d; --accent: #0072b5; }
+    :root[data-theme="dark"] { color-scheme: dark; --bg: #212529; --fg: #ffffff; --muted: #adb5bd; }
     html, body { margin: 0; background: var(--bg); color: var(--fg);
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
     #boot { display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -72,6 +81,7 @@ try:
 
     pn.config.exception_handler = _log_exception
     init_doc()
+    pn.config.theme = str(js.document.documentElement.dataset.theme or "default")
     _ns = {"__name__": "__pegtrace_app__"}
     import pegtrace
     pegtrace._web_ns = _ns  # for debugging from the JS console via pyjs.exec_eval

@@ -61,6 +61,7 @@ class AppState(param.Parameterized):
     result = param.Parameter(default=None)
     error = param.String(default="")
     message = param.String(default="")
+    theme = param.Selector(default="default", objects=["default", "dark"], doc="UI theme (not saved)")
 
     def __init__(self, **params):
         params.setdefault("pegboard", PegboardParams())

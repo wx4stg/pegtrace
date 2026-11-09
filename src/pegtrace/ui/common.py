@@ -12,6 +12,13 @@ from shapely.geometry import LineString, Polygon
 
 DISPLAY_PX = 1200
 
+# Bokeh's tab headers hard-code dark text on the active tab; follow the Panel theme instead.
+TABS_CSS = """
+.bk-header .bk-tab { color: var(--panel-on-background-color); }
+.bk-header .bk-tab.bk-active { color: var(--panel-on-background-color); background-color: var(--panel-background-color);
+  border-color: var(--panel-border-color); font-weight: 600; }
+"""
+
 
 def display_array(img: Image.Image, max_px: int = DISPLAY_PX) -> np.ndarray:
     """Downscaled RGB array for display (bokeh images are sent uncompressed)."""
@@ -43,7 +50,7 @@ def arrow(x: float, y: float, angle_deg: float, length: float, width: float | No
 
 
 def help_text(md: str) -> pn.pane.Markdown:
-    return pn.pane.Markdown(md, styles={"color": "var(--neutral-foreground-rest, #52606d)"}, margin=(0, 10))
+    return pn.pane.Markdown(md, styles={"color": "var(--secondary-text-color, #6c757d)"}, margin=(0, 10))
 
 
 def status_alert() -> pn.pane.Alert:

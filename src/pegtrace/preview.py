@@ -88,8 +88,8 @@ def front_view(result: HolderResult, pb: PegboardParams, height: int = 520) -> h
             color=OBJECT_COLOR, line_width=2, line_dash="dashed"))
     hooks = np.array(result.pegs.hooks) if result.pegs.hooks else np.zeros((0, 2))
     pins = np.array(result.pegs.pins) if result.pegs.pins else np.zeros((0, 2))
-    layers.append(hv.Points(hooks, label="hooks").opts(color="black", marker="triangle", size=9))
-    layers.append(hv.Points(pins, label="pins").opts(color="black", marker="circle", size=6))
+    layers.append(hv.Points(hooks, label="hooks").opts(color="#111111", line_color="white", marker="triangle", size=10))
+    layers.append(hv.Points(pins, label="pins").opts(color="#111111", line_color="white", marker="circle", size=7))
     return hv.Overlay(layers).opts(
         hv.opts.Overlay(title="Front (looking at the board)", data_aspect=1, responsive=True,
                         min_height=height, xlabel="x (mm)", ylabel="y (mm)", legend_position="right",
