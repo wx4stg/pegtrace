@@ -37,6 +37,8 @@ locally with `panel serve`, or as a **fully static web page** with Python runnin
      resting on a narrow one; for the pocket style, the heavier end goes down.
 5. **Design**: adjust the holder and pegboard settings. Drag a slider, or type an exact value in the box
    next to its name.
+   - A labelled diagram above each group of settings shows what each one changes (ring, pocket or shelf,
+     and the pegs).
    - Changing a setting doesn't rebuild the holder straight away (it takes seconds on the static site).
      Press **Update holder** to see the front, side-section, top and 3D views with the new settings.
      Exporting, or *Continue to export*, rebuilds first if settings changed.

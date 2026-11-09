@@ -255,6 +255,7 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
         r.wait_text("No problems found.", timeout=30_000)
         r.check(page.get_by_text("Place ring automatically").first.is_visible(),
                 "ring style by default, and the ring holder holds the T without warnings")
+        r.check(page.get_by_text("Ring: front view").first.is_visible(), "diagram of the ring settings shows")
         # type a value instead of dragging the slider (the first number box is the ring height)
         box = page.get_by_role("textbox").locator("visible=true").first
         r.check(box.input_value() == "10", f"ring height has a box to type in ({box.input_value()!r})")

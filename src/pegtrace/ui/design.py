@@ -10,6 +10,7 @@ from ..preview import front_view, scene_archive, side_view, top_view_plot
 from ..state import AppState
 from ..vtkjs import scene_pane
 from .common import FILL_WINDOW, TABS_CSS, help_text, run_busy, show, status_alert
+from .diagrams import SKETCHES
 
 PEG_FIELDS = ["preset", "spacing", "hole_d", "board_t", "peg_clear", "board_clear", "hook_rise", "columns",
               "max_pegs", "stride", "add_pins", "pin_rows", "pin_length", "peg_profile", "tab_margin"]
@@ -32,6 +33,14 @@ def param_panel(obj, fields, **kw):
         elif isinstance(p, param.Number):
             widgets[f] = pn.widgets.EditableFloatSlider
     return pn.Param(obj, parameters=fields, widgets=widgets, show_name=False, sizing_mode="stretch_width", **kw)
+
+
+def diagram(kind: str) -> pn.Card:
+    """A labelled sketch of what the settings below it change (see diagrams.py)."""
+    sketch = pn.pane.HTML(f'<div style="color: var(--panel-on-background-color, #212529)">{SKETCHES[kind]()}</div>',
+                          sizing_mode="stretch_width", margin=(0, 5))
+    return pn.Card(sketch, title="Diagram: what these settings change", collapsed=False,
+                   sizing_mode="stretch_width", margin=(5, 5))
 
 
 class DesignStep:
@@ -124,10 +133,10 @@ class DesignStep:
         @pn.depends(state.param.mode, state.flat.param.style)
         def holder_settings(mode, style):
             if mode == "flat" and style == "ring":
-                return pn.Column(self.ring_panel, self.ring_help, sizing_mode="stretch_width")
+                return pn.Column(diagram("ring"), self.ring_panel, self.ring_help, sizing_mode="stretch_width")
             if mode == "flat":
-                return pn.Column(self.flat_panel, self.suggest, sizing_mode="stretch_width")
-            return pn.Column(self.shelf_panel, sizing_mode="stretch_width")
+                return pn.Column(diagram("pocket"), self.flat_panel, self.suggest, sizing_mode="stretch_width")
+            return pn.Column(diagram("shelf"), self.shelf_panel, sizing_mode="stretch_width")
 
         @pn.depends(state.param.result, state.param.error)
         def summary(result, error):
@@ -181,7 +190,7 @@ class DesignStep:
                           else None, "active")
         settings = pn.Accordion(
             ("Holder", pn.panel(holder_settings)),
-            ("Pegboard and pegs", self.peg_panel),
+            ("Pegboard and pegs", pn.Column(diagram("pegs"), self.peg_panel, sizing_mode="stretch_width")),
             active=[0, 1], sizing_mode="stretch_width",
         )
         @pn.depends(state.param.stale)

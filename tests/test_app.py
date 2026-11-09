@@ -82,3 +82,14 @@ def test_design_numbers_can_be_typed(app):
     assert isinstance(design.peg_panel._widgets["columns"], pn.widgets.EditableIntSlider)
     panel._widgets["ring_height"].value = 17.5  # typed into the box
     assert app.state.flat.ring_height == 17.5 and app.state.stale
+
+
+def test_setting_diagrams_are_valid_svg():
+    import xml.etree.ElementTree as ET
+
+    from pegtrace.ui.diagrams import SKETCHES
+
+    for kind, sketch in SKETCHES.items():
+        html = sketch()
+        assert html.count("<svg") == 2, kind  # two views each
+        ET.fromstring(f"<root>{html.replace('&nbsp;', ' ')}</root>")  # well-formed
