@@ -30,7 +30,7 @@ def test_pegs_on_grid(hammer):
 
 
 def test_flat_bottom_prints_upright(hammer):
-    r = build_flat(hammer, FlatParams(flat_bottom=True), PegboardParams())
+    r = build_flat(hammer, FlatParams(style="pocket", flat_bottom=True), PegboardParams())
     s = oriented(r.solid, "print (upright)")
     lo, hi = s.bounds()
     assert lo[2] == pytest.approx(0, abs=1e-6)
@@ -105,7 +105,7 @@ def test_ring_upside_down_warns(letter_t):
     assert any("slide through" in w and "wide end up" in w for w in r.warnings)
     # inside the bar: the warning points to just under it
     r = build_flat(letter_t, FlatParams(style="ring", ring_top=110), PegboardParams())
-    assert any("slide through" in w and "starts at 99 mm" in w for w in r.warnings)
+    assert any("slide through" in w and "starts at 99 mm" in w for w in r.warnings), r.warnings
 
 
 def test_ring_rest_with_a_tilted_bar(letter_t):
@@ -157,3 +157,28 @@ def test_auto_direction_prefers_ring_way_up(letter_t):
     st.auto_direction()
     o = st.oriented_outline()
     assert o.centroid.y < (o.bounds[1] + o.bounds[3]) / 2  # heavier end down
+
+
+def test_ring_closes_around_separate_handles():
+    """Wire strippers hang by the joint, handles down. The handles flare apart below the
+    ring; the ring must still close around each one (the user threads them through)."""
+    import json
+    from pathlib import Path
+
+    from shapely.geometry import LineString, Polygon
+
+    from pegtrace.tracing import orient_polygon
+
+    truth = json.loads((Path(__file__).parent / "data" / "wire_strippers.json").read_text())
+    o = orient_polygon(Polygon(truth["outline_mm"]), 270.0)  # jaws up, as in the user's project
+    fp = FlatParams(style="ring", ring_top=104.5)
+    r = build_flat(o, fp, PegboardParams())
+    assert r.solid.is_valid() and r.solid.num_components() == 1
+    assert not any("slide" in w for w in r.warnings), r.warnings
+    # across the middle of the ring: a wall on each side of each handle
+    y = fp.ring_top - fp.ring_height / 2
+    cut = r.regions["walls"].intersection(LineString([(-200, y), (200, y)]))
+    assert len(getattr(cut, "geoms", [cut])) == 4, cut
+    # and the holder never overlaps the object where it hangs
+    ghost = r.ghost
+    assert (r.solid & ghost).volume() == pytest.approx(0, abs=1e-3)

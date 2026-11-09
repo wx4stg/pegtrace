@@ -72,8 +72,10 @@ isn't needed.
 - You set the ring top: the height on the object where its wide part should sit (type it, or click that
   height in the Front view, where a dashed line shows it). If the object would slide down before its wide
   part meets the ring, or slide right through, a warning says so and suggests the height that holds it.
-- A band of walls, plus the back plate and a closed front bar, circles the narrow part. The wide part rests
-  on the band, and everything below hangs free through it.
+- A band of walls, plus the back plate and a closed front bar, circles the narrow part (one loop per part
+  when there are several, like the two handles of pliers). The wide part rests on the band, and everything
+  below hangs free through it. The loops only clear the object where it sits in them: parts below that
+  flare out are threaded through by tilting the object, rather than cutting the loops open.
 - The band's underside slopes back to the board at about 50° from horizontal, so it still prints upright
   without supports.
 - *Auto* on the Orientation step picks whichever way up a ring can hold.

@@ -25,7 +25,7 @@ def body_without_pegs(result):
 
 
 def test_flat_body_has_no_overhangs(hammer):
-    r = build_flat(hammer, FlatParams(flat_bottom=True), PegboardParams())
+    r = build_flat(hammer, FlatParams(style="pocket", flat_bottom=True), PegboardParams())
     assert overhang_area(oriented(body_without_pegs(r), "print (upright)")) < 1.0
 
 

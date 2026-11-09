@@ -24,7 +24,7 @@ import numpy as np
 from shapely.geometry import Point, Polygon
 
 from .csg import Solid, extrude_x, extrude_z
-from .geom2d import BIG, above, below, clean, rect, sweep_down, sweep_up, union
+from .geom2d import BIG, above, below, clean, polygons_of, rect, sweep_down, sweep_up, union
 from .holder import HolderResult
 from .params import FlatParams, PegboardParams
 from .pegs import PegLayout, layout_pegs, peg_solids
@@ -90,23 +90,23 @@ def ring_level(pc: Polygon, fp: FlatParams) -> tuple[float, float] | None:
 
 
 def ring_rest(pc: Polygon, top: float, fp: FlatParams) -> float | None:
-    """Where an object (clearance outline ``pc``) sliding down through a ring whose top is at
-    ``top`` comes to rest: the lowest point of the parts that stick out past the ring's opening
-    (the x extent of ``pc`` below ``top``, which must all pass through). None: it slides through.
-    """
-    lower = below(pc, top)
-    if lower.is_empty:
-        return None
-    lo_x0, _, lo_x1, _ = lower.bounds
+    """Where an object (clearance outline ``pc``) sliding down into a ring whose top is at
+    ``top`` comes to rest: the lowest point above the ring that sticks out past every hole in
+    it (the object's cross-section within the ring; one per handle when there are several).
+    None: it slides through."""
     _, y0, _, y1 = pc.bounds
+    holes = polygons_of(above(below(pc, top), top - fp.ring_height))
+    if not holes:
+        return None
     s = max(1.0, fp.wall / 2)  # overhang needed to rest on the ring rather than slip past it
-    over = clean(pc.difference(rect(lo_x0 - s, y0 - 1, lo_x1 + s, y1 + 1)))
+    strips = union([rect(h.bounds[0] - s, y0 - 1, h.bounds[2] + s, y1 + 1) for h in holes])
+    over = clean(above(pc, top).difference(strips))
     return None if over.is_empty else float(max(over.bounds[1], top))
 
 
 def suggest_ring_top(pc: Polygon, start: float, fp: FlatParams) -> float | None:
     """A ring top at or above ``start`` that the object rests on without sliding: move up to
-    where it would come to rest until that settles (the opening can widen on the way)."""
+    where it would come to rest until that settles (the holes can change on the way)."""
     top = start
     for _ in range(8):
         rest = ring_rest(pc, top, fp)
@@ -118,12 +118,28 @@ def suggest_ring_top(pc: Polygon, start: float, fp: FlatParams) -> float | None:
     return top
 
 
+def ring_top_below(pc: Polygon, start: float, fp: FlatParams, step: float = 0.5) -> float | None:
+    """The highest ring top at or below ``start`` that the object rests on right away (for
+    a ring set inside a wide part, which then slides through)."""
+    y0 = pc.bounds[1]
+    for t in np.arange(start, y0, -step):
+        rest = ring_rest(pc, float(t), fp)
+        if rest is not None and rest - t < 1.0:
+            return float(t)
+    return None
+
+
 def _ring_regions(outline: Polygon, pc: Polygon, u, fp: FlatParams, pb: PegboardParams) -> FlatRegions:
     y0, y1 = outline.bounds[1], outline.bounds[3]
     top = min(max(y0 + fp.ring_top, y0 + 0.5), y1)
     bottom = top - fp.ring_height
     band = rect(pc.bounds[0] - BIG, bottom, pc.bounds[2] + BIG, top)
     ring = clean(below(pc, top).buffer(fp.wall, quad_segs=12).intersection(band))
+    # The walls only clear the object's cross-section where it sits in the ring. Parts below
+    # it are threaded through by tilting the object (handles that flare apart, say), so
+    # unlike a pocket they don't cut the ring open; the object itself (pc) stays clear.
+    inside = above(below(pc, top), bottom - 1.0)
+    u = union([sweep_up(inside), pc])
     walls = clean(ring.difference(u))
     zmax = fp.back_t + fp.object_thickness + fp.clear_z + fp.lip_t
     y_floor = bottom - CHAMFER_SLOPE * zmax  # lowest point of the chamfer under the ring
@@ -221,8 +237,8 @@ def build_flat(outline: Polygon, fp: FlatParams, pb: PegboardParams) -> HolderRe
             return f"{np.floor((y - y0) * 2) / 2:g}"
 
         if reg.ring_rest is None:
-            low = suggest_ring_top(reg.grown, y0 + 0.5, fp)
-            hint = (f" The lowest wide part starts at {as_setting(low)} mm: try that as the ring top."
+            low = ring_top_below(reg.grown, reg.pocket_top, fp)
+            hint = (f" A wider part starts at {as_setting(low)} mm: try that as the ring top."
                     if low is not None else " Turn the object wide end up, or use the pocket style.")
             warnings.append("Nothing above the ring top sticks out past the part inside the ring, so the "
                             "object would slide through." + hint)
