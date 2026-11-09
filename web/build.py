@@ -1,6 +1,6 @@
 """Build the static PegTrace site (Python runs in the browser via pyjs).
 
-    python web/build.py [--app web/poc_app.py] [--recreate-env] [--app-only] [--out build/dist]
+    python web/build.py [--app web/app_entry.py] [--recreate-env] [--app-only] [--out build/dist]
 
 Steps:
 1. create an emscripten-wasm32 conda env from emscripten-forge (+ conda-forge noarch)
@@ -108,7 +108,7 @@ def build(app: Path, out: Path, recreate: bool, app_only: bool = False) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--app", type=Path, default=WEB / "poc_app.py")
+    ap.add_argument("--app", type=Path, default=WEB / "app_entry.py")
     ap.add_argument("--out", type=Path, default=ROOT / "build" / "dist")
     ap.add_argument("--recreate-env", action="store_true")
     ap.add_argument("--app-only", action="store_true", help="reuse packed env; repack pegtrace + page only")

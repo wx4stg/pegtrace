@@ -134,14 +134,13 @@ class CalibrateStep:
                         self.ruler_mm]
             return pn.Column(*rows, sizing_mode="stretch_width")
 
+        # A fresh plot per photo (see TraceStep.view); the editable point layers are reused.
         @pn.depends(self.state.param.cal_method, self.state.param.photo)
         def plot(method, photo):
-            # a fresh image (and axis ranges) per photo; the editable point layers are reused
             layer = self.corners_layer if method == RECT else self.ruler_layer
-            obj = (photo_rgb(photo) * layer).opts(
+            obj = (photo_rgb(photo).opts(default_tools=["pan", "wheel_zoom", "reset"]) * layer).opts(
                 hv.opts.Overlay(data_aspect=1, responsive=True, min_height=560, xaxis=None, yaxis=None,
-                                active_tools=["point_draw"]),
-                hv.opts.RGB(default_tools=["pan", "wheel_zoom", "reset"]))
+                                active_tools=["point_draw"]))
             return pn.pane.HoloViews(obj, sizing_mode="stretch_both", min_height=560, linked_axes=False)
 
         controls = pn.Column("### Scale reference", self.method, settings, self.ppm, self.apply, self.alert,

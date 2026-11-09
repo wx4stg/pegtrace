@@ -41,10 +41,10 @@ class TraceStep:
         self.poly_pipe = hv.streams.Pipe(data=[])
         self.polys = hv.DynamicMap(lambda data: hv.Polygons(data), streams=[self.poly_pipe]).opts(
             hv.opts.Polygons(fill_alpha=0.15, fill_color="#e15759", line_color="#e15759", line_width=2))
-        self.lasso = None  # recreated with each image (see view)
         self.edit = hv.streams.PolyEdit(source=self.polys, vertex_style={"color": "#e15759", "size": 8},
                                         shared=True, show_vertices=True)
         self.edit.add_subscriber(self._on_edit)
+        self.lasso = None  # recreated with each image, see view()
 
         state.param.watch(self._on_outline, "outline")
 
@@ -114,9 +114,10 @@ class TraceStep:
             pn.Row(self.auto, self.clear), self.simplify, self.stats, self.done, self.alert,
             width=340,
         )
+        # A fresh plot per calibration: with data_aspect + responsive, HoloViews does not
+        # update the axis ranges of an existing plot, so streamed images would be cropped.
         @pn.depends(self.state.param.calibration)
         def plot(cal):
-            # a fresh image (and axis ranges) per calibration; the outline layer is reused
             rgb = cal_rgb(cal).opts(tools=["poly_select"], default_tools=["pan", "wheel_zoom", "reset"])
             self.lasso = hv.streams.Lasso(source=rgb)
             self.lasso.add_subscriber(self._on_lasso)

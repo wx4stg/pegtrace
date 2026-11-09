@@ -67,8 +67,25 @@ class Run:
         self.shots = shots
         self.n = 0
         self.errors: list[str] = []
-        page.on("console", lambda m: self.errors.append(m.text) if m.type == "error" else None)
-        page.on("pageerror", lambda e: self.errors.append(str(e)))
+        self.step = "boot"
+        self.console: list[str] = []
+        page.on("console", self._on_console)
+        page.on("pageerror", lambda e: self.errors.append(
+            f"[{self.step}] uncaught: {getattr(e, 'name', '')} {getattr(e, 'message', e)} {(getattr(e, 'stack', '') or '')[:400]}"))
+
+    def _on_console(self, m):
+        text = m.text
+        if m.type == "error" and text.strip() in ("Object", "JSHandle@object", "[object Object]"):
+            try:  # describe error objects instead of printing "Object"
+                text = " | ".join(a.evaluate("e => e && (e.stack || e.message || JSON.stringify(e))") or "?"
+                                  for a in m.args)
+            except Exception:
+                pass
+        if m.type == "error":
+            loc = m.location or {}
+            text = f"{text} (at {loc.get('url', '?')}:{loc.get('lineNumber', '?')})"
+            self.errors.append(text)
+        self.console.append(f"[{m.type}] {text}")
 
     def shot(self, name: str):
         self.n += 1
@@ -111,8 +128,42 @@ def run(url: str, shots: Path, boot_timeout: float) -> None:
     with sync_playwright() as p:
         browser = p.chromium.launch()
         ctx = browser.new_context(viewport={"width": 1500, "height": 1000}, accept_downloads=True)
+        ctx.add_init_script("""
+          window.addEventListener('unhandledrejection', (e) => {
+            const r = e.reason;
+            let d;
+            try { d = r && (r.stack || r.message) ? (r.stack || r.message)
+                       : JSON.stringify(r, Object.getOwnPropertyNames(Object(r))).slice(0, 800); }
+            catch (err) { d = String(r); }
+            console.warn('UNHANDLED REJECTION: ' + d + ' keys=' + (r && typeof r === 'object' ? Object.keys(r).join(',') : ''));
+          });
+          window.addEventListener('error', (e) => {
+            let d;
+            try { d = JSON.stringify(e.error, Object.getOwnPropertyNames(Object(e.error))).slice(0, 800); }
+            catch (err) { d = String(e.error); }
+            console.warn('UNHANDLED ERROR: ' + e.message + ' @ ' + e.filename + ':' + e.lineno + ':' + e.colno
+                         + ' obj=' + d + ' ctor=' + (e.error && e.error.constructor && e.error.constructor.name));
+          });""")
         page = ctx.new_page()
         r = Run(page, shots)
+        try:
+            steps(r, page, url, boot_timeout)
+        except BaseException:
+            r.shot("failure")
+            print("---- errors and rejections ----")
+            for line in r.console:
+                if "UNHANDLED" in line or line.startswith("[error]"):
+                    print(line[:1500])
+            print("---- last console messages ----")
+            for line in r.console[-25:]:
+                print(line if len(line) < 3000 else line[:300] + "\n  ...\n" + line[-1500:])
+            raise
+        finally:
+            browser.close()
+
+
+def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
+    if True:
         print(f"opening {url}")
         t0 = time.time()
         page.goto(url)
@@ -120,17 +171,31 @@ def run(url: str, shots: Path, boot_timeout: float) -> None:
         print(f"  app ready after {time.time() - t0:.1f}s")
 
         print("step 1: photo")
+
+        r.step = "step 1: photo"
         r.click("Try the sample photo")
         r.wait_text("Loaded the sample photo")
         page.wait_for_timeout(1500)
         r.shot("scale_step")
 
         print("step 2: scale")
+
+        r.step = "step 2: scale"
         r.click("Apply scale")
         r.wait_text("Scale applied")
         page.wait_for_timeout(1500)
 
+        rng = page.evaluate("""() => {
+          const all = Bokeh.documents.flatMap(d => [...d.all_models]);
+          // newest poly_select plot (replaced plots can linger in all_models)
+          const p = all.filter(m => m.toolbar && m.toolbar.tools.some(t => (t.type||t.constructor.name) === 'PolySelectTool')).pop();
+          return p ? [p.x_range.start, p.x_range.end, p.y_range.start, p.y_range.end] : null;
+        }""")
+        r.check(rng is not None and rng[0] < 0 and rng[1] > 200 and rng[2] < 0 and rng[3] > 250,
+                f"trace plot shows the whole calibrated image (ranges {rng})")
         print("step 3: trace by hand with poly_select")
+
+        r.step = "step 3: trace by hand with poly_select"
         box = r.visible_canvas()
         r.check(box is not None, "trace plot canvas visible")
         cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
@@ -151,6 +216,8 @@ def run(url: str, shots: Path, boot_timeout: float) -> None:
         r.click("Use this outline")
 
         print("step 4: orientation")
+
+        r.step = "step 4: orientation"
         page.wait_for_timeout(800)
         r.click("Auto: long axis vertical")
         page.wait_for_timeout(1500)
@@ -158,6 +225,8 @@ def run(url: str, shots: Path, boot_timeout: float) -> None:
         r.click("Continue to design")
 
         print("step 5: design")
+
+        r.step = "step 5: design"
         r.wait_text("Size:")
         page.wait_for_timeout(1500)
         r.shot("design_front")
@@ -166,9 +235,12 @@ def run(url: str, shots: Path, boot_timeout: float) -> None:
         r.tab("3D")
         page.wait_for_timeout(3000)
         r.shot("design_3d")
+        r.step = "after 3d"
         r.tab("Front")
 
         print("step 4b/5b: shelf mode")
+
+        r.step = "step 4b/5b: shelf mode"
         r.tab("4 · Orientation")
         r.click("Shelf (top-down footprint)")
         page.wait_for_timeout(1000)
@@ -188,6 +260,8 @@ def run(url: str, shots: Path, boot_timeout: float) -> None:
         r.wait_text("Size:")
 
         print("step 6: export")
+
+        r.step = "step 6: export"
         r.click("Continue to export")
         page.wait_for_timeout(800)
         with page.expect_download(timeout=60_000) as dl:
@@ -203,7 +277,6 @@ def run(url: str, shots: Path, boot_timeout: float) -> None:
 
         bad = [e for e in r.errors if "favicon" not in e]
         r.check(not bad, "no browser console errors" + ("" if not bad else f": {bad[:5]}"))
-        browser.close()
 
 
 def main() -> None:

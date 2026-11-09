@@ -64,9 +64,17 @@ import js
 try:
     from pegtrace.webshim import install
     install()
+    import panel as pn
     from panel.io.pyodide import init_doc, write
+
+    def _log_exception(exc):
+        js.console.error("Python callback error:" + chr(10) + "".join(traceback.format_exception(exc)))
+
+    pn.config.exception_handler = _log_exception
     init_doc()
     _ns = {"__name__": "__pegtrace_app__"}
+    import pegtrace
+    pegtrace._web_ns = _ns  # for debugging from the JS console via pyjs.exec_eval
     exec(compile(str(js.globalThis.__pegtrace_app_code), "{APP}", "exec"), _ns)
     # assignment, not a bare expression: pyjs' async_exec_eval runs a trailing expression twice
     _rendered = await write("app", _ns["app"])
