@@ -1,0 +1,110 @@
+# empack config for the PegTrace static site.
+# Starts from empack's default config and drops files the browser never uses.
+# JS/CSS bundles are excluded because index.html loads them from CDNs.
+packages:
+  setuptools:
+    exclude_patterns:
+      - pattern: '**/_distutils_hack/**'
+      - pattern: '**/distutils-precedence.pth'
+      - pattern: '**/setuptools/**'
+      - pattern: '**/pkg_resources/_vendor/**'
+  zlib:
+    exclude_patterns:
+      - pattern: '**/so'
+  numpy:
+    exclude_patterns:
+      - pattern: '**/*.pyx'
+      - pattern: '**/*.pyc'
+      - pattern: '**/*.typed'
+      - pattern: '**/*.egg-info'
+      - pattern: '**/numpy/_core/include/**'
+      - pattern: '**/numpy/f2py/**'
+  panel:
+    exclude_patterns:
+      # keep dist/css (read by Python for stylesheets), drop JS bundles
+      - pattern: '**/panel/dist/bundled/**'
+      - pattern: '**/panel/dist/lib/**'
+      - pattern: '**/panel/dist/dts/**'
+      - pattern: '**/panel/dist/wheels/**'
+      - pattern: '**/panel/dist/panel.js'
+      - pattern: '**/panel/dist/panel.js.map'
+      - pattern: '**/panel/dist/panel.min.js'
+      - pattern: '**/panel/dist/panel.json'
+      - pattern: '**/panel/tests/**'
+      - pattern: '**/panel/*.ts'
+      - pattern: '**/panel/models/**/*.ts'
+  bokeh:
+    exclude_patterns:
+      - pattern: '**/bokeh/server/static/**'
+      - pattern: '**/bokeh/sampledata/**'
+  holoviews:
+    exclude_patterns:
+      - pattern: '**/holoviews/examples/**'
+      - pattern: '**/holoviews/tests/**'
+      - pattern: '**/holoviews/plotting/mpl/**'
+      - pattern: '**/holoviews/plotting/plotly/**'
+  # holoviews' conda recipe pulls in matplotlib; the bokeh backend never imports it
+  matplotlib-base:
+    exclude_patterns:
+      - pattern: '**'
+  fonttools:
+    exclude_patterns:
+      - pattern: '**'
+  kiwisolver:
+    exclude_patterns:
+      - pattern: '**'
+  qhull:
+    exclude_patterns:
+      - pattern: '**'
+  cycler:
+    exclude_patterns:
+      - pattern: '**'
+  pyjs-dev:
+    exclude_patterns:
+      - pattern: 'include/**'
+      - pattern: 'lib/cmake/**'
+      - pattern: 'etc/**'
+      - pattern: '**/*.a'
+      - pattern: 'lib_js/**'
+  pyjs-rt:
+    exclude_patterns:
+      - pattern: 'lib_js/**'
+  pip:
+    exclude_patterns:
+      - pattern: '**'
+default:
+  exclude_patterns:
+    - pattern: 'bin/**'
+    - pattern: '**/bin/**'
+    - pattern: 'tests/**'
+    - pattern: '**/tests/**'
+    - pattern: '**/*.ini'
+    - pattern: '**/*.exe'
+    - pattern: '**/*.c'
+    - pattern: '**/*.h'
+    - pattern: '**/*.a'
+    - pattern: '**/*.pxd'
+    - pattern: '**/*.pyx'
+    - pattern: '**/*.pyc'
+    - pattern: '**/*.pyi'
+    - pattern: '**/*.typed'
+    - pattern: '**/*.egg-info'
+    - pattern: '**/*.js.map'
+    - pattern: 'include/**'
+    - pattern: 'lib/cmake/**'
+    - pattern: 'lib/pkgconfig/**'
+    - pattern: 'share/doc/**'
+    - pattern: 'share/man/**'
+    - pattern: 'man/**'
+    - pattern: '**/site-packages/pip/_vendor/**'
+    - pattern: '**/idlelib/**'
+    - pattern: '**/ensurepip/**'
+    - pattern: '**/tkinter/**'
+    - pattern: '**/turtledemo/**'
+    - pattern: '**/lib2to3/**'
+    - pattern: '**/pydoc_data/**'
+    - pattern: '**/lib/python3.*/test/**'
+    - pattern: 'Scripts/*'
+    - pattern: 'share/jupyter/nbextensions/**'
+    - pattern: 'share/jupyter/labextensions/**'
+    - pattern: 'etc/jupyter/nbconfig/**'

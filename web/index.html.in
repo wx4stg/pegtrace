@@ -59,15 +59,20 @@
       status("Starting app…");
       globalThis.__pegtrace_app_code = await (await fetch("{APP}")).text();
       await pyjs.async_exec_eval(`
-from pegtrace.webshim import install
-install()
+import traceback
 import js
-from panel.io.pyodide import init_doc, write
-init_doc()
-_ns = {"__name__": "__pegtrace_app__"}
-exec(compile(str(js.globalThis.__pegtrace_app_code), "{APP}", "exec"), _ns)
-# assignment, not a bare expression: pyjs' async_exec_eval runs a trailing expression twice
-_rendered = await write("app", _ns["app"])
+try:
+    from pegtrace.webshim import install
+    install()
+    from panel.io.pyodide import init_doc, write
+    init_doc()
+    _ns = {"__name__": "__pegtrace_app__"}
+    exec(compile(str(js.globalThis.__pegtrace_app_code), "{APP}", "exec"), _ns)
+    # assignment, not a bare expression: pyjs' async_exec_eval runs a trailing expression twice
+    _rendered = await write("app", _ns["app"])
+except BaseException:
+    js.console.error(traceback.format_exc())
+    raise
 `);
       boot.remove();
       globalThis.__pegtrace_state = "ready";

@@ -26,7 +26,8 @@ ENV_PREFIX = ROOT / "build" / "wasm-env"
 EMPACK = Path(sys.executable).with_name("empack")
 CHANNELS = ["https://prefix.dev/emscripten-forge-4x", "conda-forge"]
 PACKAGES = [
-    "python", "pyjs", "numpy", "pillow", "shapely", "contourpy",
+    "python", "pyjs", "numpy=2.5.2",  # last emscripten-forge numpy without openblas (-8 MB)
+    "pillow", "shapely", "contourpy",
     "panel", "bokeh", "holoviews", "param",
 ]
 MANIFOLD_JS_VERSION = "3.5.4"
@@ -70,7 +71,8 @@ def build(app: Path, out: Path, recreate: bool, app_only: bool = False) -> None:
         if out.exists():
             shutil.rmtree(out)
         env_out.mkdir(parents=True)
-        run([EMPACK, "pack", "env", "--env-prefix", ENV_PREFIX, "--outdir", env_out])
+        run([EMPACK, "pack", "env", "--env-prefix", ENV_PREFIX, "--outdir", env_out,
+             "--config", WEB / "empack_config.yaml", "--no-use-cache"])
 
     # our package, staged without caches
     stage = ROOT / "build" / "stage" / "pegtrace"
