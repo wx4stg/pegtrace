@@ -59,6 +59,7 @@ class AppState(param.Parameterized):
     shelf = param.ClassSelector(class_=ShelfParams)
     export = param.ClassSelector(class_=ExportParams)
     result = param.Parameter(default=None)
+    stale = param.Boolean(default=False, doc="Design settings changed since the holder was built")
     error = param.String(default="")
     message = param.String(default="")
     theme = param.Selector(default="default", objects=["default", "dark"], doc="UI theme (not saved)")
@@ -185,13 +186,16 @@ class AppState(param.Parameterized):
 
     # ------------------------------------------------------------ build
     def _params_changed(self, *events):
-        self.rebuild()
+        # Building takes seconds on the static site, so settings only mark the holder out of
+        # date; the Design step's Update button (or an export) rebuilds it.
+        self.stale = True
 
     @param.depends("outline", "mode", "direction", watch=True)
     def rebuild(self):
         from .holder_flat import build_flat
         from .holder_shelf import build_shelf
 
+        self.stale = False
         o = self.oriented_outline()
         if o is None:
             self.result = None
@@ -221,6 +225,8 @@ class AppState(param.Parameterized):
     def stl_bytes(self) -> bytes:
         from .export import solid_stl
 
+        if self.stale:  # export what the settings say, not the last preview
+            self.rebuild()
         if self.result is None:
             raise ValueError("Nothing to export yet.")
         return solid_stl(self.result.solid, self.export.orientation)

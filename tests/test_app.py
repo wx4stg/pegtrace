@@ -57,3 +57,19 @@ def test_corner_drag_updates_state(app):
     h = state.photo.size[1]
     steps[1]._on_corner_draw({"x": [10, 20, 30, 40], "y": [h - 1, h - 2, h - 3, h - 4]})
     assert state.corners_px[0] == (10.0, 1.0)
+
+
+def test_design_update_button(app):
+    state, steps = app.state, app.steps
+    steps[0]._on_sample(None)
+    steps[1]._on_apply(None)
+    steps[2]._on_auto(None)
+    state.auto_direction()
+    design = steps[4]
+    pn.panel(design.view()).get_root()
+    v0 = state.result.info["volume_cm3"]
+    assert design.update.disabled
+    state.flat.wall = 4.0  # a slider moves: nothing is rebuilt yet
+    assert state.stale and not design.update.disabled and state.result.info["volume_cm3"] == v0
+    design.update.clicks += 1
+    assert not state.stale and design.update.disabled and state.result.info["volume_cm3"] > v0

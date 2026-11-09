@@ -8,7 +8,7 @@ import panel as pn
 from ..preview import front_view, scene_archive, side_view, top_view_plot
 from ..state import AppState
 from ..vtkjs import scene_pane
-from .common import FILL_WINDOW, TABS_CSS, help_text, show, status_alert
+from .common import FILL_WINDOW, TABS_CSS, help_text, run_busy, show, status_alert
 
 PEG_FIELDS = ["preset", "spacing", "hole_d", "board_t", "peg_clear", "board_clear", "hook_rise", "columns",
               "max_pegs", "stride", "add_pins", "pin_rows", "pin_length", "peg_profile", "tab_margin"]
@@ -46,8 +46,13 @@ class DesignStep:
         self.views = None
         self._pending_3d = False
         self._dirty_3d = True
+        self.preview = None  # the summary and views, see view()
+        # Settings only mark the holder out of date (building takes seconds on the static site)
+        self.update = pn.widgets.Button(name="Update holder", button_type="primary", disabled=not state.stale)
+        self.update.on_click(lambda _: self._rebuild())
+        state.param.watch(lambda e: setattr(self.update, "disabled", not e.new), "stale")
         self.next = pn.widgets.Button(name="Continue to export", button_type="primary")
-        self.next.on_click(lambda _: on_done() if on_done else None)
+        self.next.on_click(lambda _: self._rebuild(then=on_done) if state.stale else on_done() if on_done else None)
         self.peg_panel = param_panel(state.pegboard, PEG_FIELDS)
         self.flat_panel = param_panel(state.flat, FLAT_FIELDS)
         self.ring_panel = param_panel(state.flat, RING_FIELDS)
@@ -87,12 +92,22 @@ class DesignStep:
                                 enable_keybindings=True)
         self.scene_box.objects = [self.scene]
 
+    def _rebuild(self, then=None):
+        """Build the holder with the current settings, with a spinner over the views."""
+        def work():
+            self.state.rebuild()
+            if then:
+                then()
+
+        run_busy(self.preview, work)
+
     def _on_suggest(self, _):
         pct = self.state.suggest_pocket()
         if pct is None:
             show(self.alert, "No pocket depth up to 95 % holds this shape securely; check the direction.", "warning")
         else:
             show(self.alert, f"Pocket depth set to {pct:.0f} % of the object's height.", "success")
+            self._rebuild()
 
     def view(self):
         state = self.state
@@ -160,7 +175,14 @@ class DesignStep:
             ("Pegboard and pegs", self.peg_panel),
             active=[0, 1], sizing_mode="stretch_width",
         )
-        controls = pn.Column("### Holder settings", settings, self.alert, self.next, width=360,
-                             scroll=True, sizing_mode="stretch_height")
-        return pn.Row(controls, pn.Column(pn.panel(summary), views, sizing_mode="stretch_both"),
-                      sizing_mode="stretch_width", styles=FILL_WINDOW)
+        @pn.depends(state.param.stale)
+        def stale_note(stale):
+            if not stale:
+                return pn.Spacer(height=0)
+            return pn.pane.Alert("Settings changed. Press **Update holder** to see them.", alert_type="info",
+                                 margin=(0, 5))
+
+        controls = pn.Column("### Holder settings", self.update, pn.panel(stale_note), settings, self.alert,
+                             self.next, width=360, scroll=True, sizing_mode="stretch_height")
+        self.preview = pn.Column(pn.panel(summary), views, sizing_mode="stretch_both")
+        return pn.Row(controls, self.preview, sizing_mode="stretch_width", styles=FILL_WINDOW)

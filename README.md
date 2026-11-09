@@ -36,7 +36,9 @@ locally with `panel serve`, or as a **fully static web page** with Python runnin
    - *Auto* makes the long axis vertical. For the ring style it picks the way up that has a wide part
      resting on a narrow one; for the pocket style, the heavier end goes down.
 5. **Design**: adjust the holder and pegboard settings.
-   - Front, side-section, top and 3D views update live.
+   - Changing a setting doesn't rebuild the holder straight away (it takes seconds on the static site).
+     Press **Update holder** to see the front, side-section, top and 3D views with the new settings.
+     Exporting, or *Continue to export*, rebuilds first if settings changed.
    - Warnings flag a shallow pocket, a single hook, an object that can tip out, and similar problems.
    - *Suggest pocket depth* finds the smallest pocket that holds the object securely.
 6. **Export**: download the STL, either upright for printing or in mounted orientation. You can also save or

@@ -11,6 +11,7 @@ Exits non-zero on the first failed check.
 from __future__ import annotations
 
 import argparse
+import re
 import functools
 import http.server
 import socket
@@ -288,14 +289,33 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
         print("step 5c: pocket style")
 
         r.step = "step 5c: pocket style"
+        size_before = page.get_by_text(re.compile(r"Size:.*Volume")).first.inner_text()
         page.locator("select:has(option:text-is('pocket'))").first.select_option("pocket")
         r.wait_text("Suggest pocket depth", timeout=30_000)
-        r.tab("4 · Orientation")
-        r.click("Auto: long axis vertical")
-        page.wait_for_timeout(1500)
-        r.tab("5 · Design")
-        r.wait_text("Size:", timeout=30_000)
-        r.check(True, "pocket style builds")
+        r.wait_text("Settings changed", timeout=30_000)
+        r.check(page.get_by_text(re.compile(r"Size:.*Volume")).first.inner_text() == size_before,
+                "changing a setting waits for Update holder")
+        page.evaluate("""() => {
+          const D = Bokeh.require("document/document").Document, apply = D.prototype.apply_json_patch;
+          window.__loading = [];
+          D.prototype.apply_json_patch = function (patch, ...rest) {
+            for (const e of patch.events || []) {
+              if (e.attr === "css_classes") {
+                window.__loading.push([performance.now(), String(e.model && e.model.id), e.new.includes("pn-loading")]);
+              }
+            }
+            return apply.call(this, patch, ...rest);
+          };
+        }""")
+        r.click("Update holder")
+        page.wait_for_function("() => window.__loading.some(e => e[2]) && window.__loading.some(e => !e[2])",
+                               timeout=120_000)  # spinner on, then off
+        page.wait_for_timeout(500)
+        log = page.evaluate("window.__loading")
+        size_after = page.get_by_text(re.compile(r"Size:.*Volume")).first.inner_text()
+        r.check(any(on for _, _, on in log) and size_after != size_before,
+                f"Update holder rebuilt the holder (as a pocket) with a spinner ({size_before} -> {size_after}, "
+                f"{len(log)} loading updates)")
         r.shot("pocket_front")
         r.tab("Side section")
         r.shot("pocket_side")

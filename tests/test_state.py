@@ -29,10 +29,20 @@ def test_full_pipeline(ready_state):
 def test_params_trigger_rebuild(ready_state):
     s, _ = ready_state
     v0 = s.result.solid.volume()
-    s.flat.wall = 4.0
-    assert s.result.solid.volume() > v0
-    s.mode = "shelf"
+    s.flat.wall = 4.0  # settings wait for an explicit rebuild (the Update button)
+    assert s.stale and s.result.solid.volume() == v0
+    s.rebuild()
+    assert not s.stale and s.result.solid.volume() > v0
+    s.mode = "shelf"  # outline, mode and direction rebuild at once
     assert s.result.mode == "shelf"
+
+
+def test_export_rebuilds_stale_holder(ready_state):
+    s, _ = ready_state
+    s.flat.wall = 4.0
+    assert s.stale
+    s.stl_bytes()
+    assert not s.stale and s.result.info["volume_cm3"] > 0
 
 
 def test_project_roundtrip(ready_state):
@@ -40,6 +50,7 @@ def test_project_roundtrip(ready_state):
     s.mode = "shelf"
     s.shelf.rim_height = 4
     s.pegboard.preset = "US 1/8 in hardboard (1 in grid, 3/16 in holes)"
+    s.rebuild()
     text = s.to_json()
     s2 = AppState()
     s2.from_json(text)

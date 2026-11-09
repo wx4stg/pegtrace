@@ -53,14 +53,19 @@ class ExportStep:
             show(self.alert, f"Could not load that project: {e}", "danger")
 
     def view(self):
-        @pn.depends(self.state.param.result)
-        def summary(result):
+        @pn.depends(self.state.param.result, self.state.param.stale)
+        def summary(result, stale):
             if result is None:
                 return pn.pane.Alert("Nothing to export yet. Finish the earlier steps first.", alert_type="warning")
             sx, sy, sz = result.info["size_mm"]
-            return pn.pane.Markdown(
+            text = pn.pane.Markdown(
                 f"**Holder:** {result.mode} mode, {sx:.0f} × {sy:.0f} × {sz:.0f} mm, "
                 f"{result.info['volume_cm3']:.1f} cm³, {len(result.warnings)} warning(s).")
+            if not stale:
+                return text
+            return pn.Column(text, pn.pane.Alert(
+                "The Design settings changed since the holder was last updated. The download uses the new "
+                "settings; press *Update holder* on the Design step to check them first.", alert_type="info"))
 
         return pn.Column(
             "### Export",
