@@ -273,6 +273,18 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
         path = dl.value.path()
         size = Path(path).stat().st_size
         r.check(size > 10_000, f"downloaded STL ({size / 1024:.0f} KB)")
+
+        with page.expect_download(timeout=60_000) as dl:
+            r.click("Save project", exact=False)
+            page.wait_for_timeout(1500)
+            if not dl.is_done():
+                r.click("Save project", exact=False)
+        proj = Path(dl.value.path())
+        r.check(proj.stat().st_size > 10_000 and proj.read_text().startswith('{"app": "pegtrace"'),
+                f"saved project ({proj.stat().st_size / 1024:.0f} KB)")
+        page.locator("input[type=file][accept='.json']").set_input_files(str(proj))
+        r.wait_text("Project loaded.", timeout=120_000)
+        r.check(True, "project file loaded back")
         r.shot("export")
 
         bad = [e for e in r.errors if "favicon" not in e]

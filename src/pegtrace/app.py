@@ -21,6 +21,9 @@ STEPS = [LoadStep, CalibrateStep, TraceStep, OrientStep, DesignStep, ExportStep]
 
 
 def setup() -> None:
+    from .compat import patch_holoviews_callbacks
+
+    patch_holoviews_callbacks()
     pn.extension("vtk", notifications=False)
     pn.config.throttled = True  # sliders apply on release
     hv.extension("bokeh", logo=False)

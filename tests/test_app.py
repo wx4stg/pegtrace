@@ -30,7 +30,8 @@ def test_full_ui_flow(app):
     # render every view once
     for s in steps:
         pn.panel(s.view()).get_root()
-    design._update_3d(force=True)
+    design.views.active = design.TAB_3D
+    design._apply_3d()
     assert design.scene.object.startswith("data:application/octet-stream;base64,")
     data = export._stl()
     assert data is not None and len(data.getvalue()) > 1000

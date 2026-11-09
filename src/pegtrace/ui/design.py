@@ -25,6 +25,7 @@ def param_panel(obj, fields, **kw):
 
 class DesignStep:
     title = "5 · Design"
+    TAB_3D = 3
 
     def __init__(self, state: AppState, on_done=None):
         self.state = state
@@ -40,6 +41,9 @@ class DesignStep:
         # VTKJS views don't redraw when only data_url changes, so each update swaps in a new pane
         self.scene_box = pn.Column(sizing_mode="stretch_both", min_height=560)
         self.scene = None
+        self.views = None
+        self._pending_3d = False
+        self._dirty_3d = True
         self.next = pn.widgets.Button(name="Continue to export", button_type="primary")
         self.next.on_click(lambda _: on_done() if on_done else None)
         self.peg_panel = param_panel(state.pegboard, PEG_FIELDS)
@@ -50,12 +54,25 @@ class DesignStep:
             w.param.watch(lambda e: self._update_3d(force=True), "value")
 
     def _update_3d(self, force=False):
+        """Refresh the 3D view, but only while its tab is showing, and debounced: replacing
+        VTK panes in quick succession races their initialisation in the browser."""
+        if self.views is None or self.views.active != self.TAB_3D:
+            self._dirty_3d = True
+            return
+        if not (force or self.live3d.value):
+            return
+        if self._pending_3d:
+            return
+        self._pending_3d = True
+        pn.state.add_periodic_callback(self._apply_3d, period=300, count=1)
+
+    def _apply_3d(self):
+        self._pending_3d = False
+        self._dirty_3d = False
         r = self.state.result
         if r is None:
             self.scene = None
             self.scene_box.objects = []
-            return
-        if not (force or self.live3d.value):
             return
         archive = scene_archive(r, self.state.pegboard, show_board=self.show_board.value,
                                 show_object=self.show_object.value)
@@ -119,7 +136,7 @@ class DesignStep:
                                                                         min_height=400)
             return top_view_plot(result)
 
-        views = pn.Tabs(
+        views = self.views = pn.Tabs(
             ("Front", pn.pane.HoloViews(front, sizing_mode="stretch_both", min_height=560, linked_axes=False)),
             ("Side section", pn.pane.HoloViews(side, sizing_mode="stretch_both", min_height=560, linked_axes=False)),
             ("Top", pn.pane.HoloViews(top, sizing_mode="stretch_both", min_height=560, linked_axes=False)),
@@ -127,6 +144,8 @@ class DesignStep:
                              self.scene_box, sizing_mode="stretch_both")),
             sizing_mode="stretch_both", dynamic=False,
         )
+        views.param.watch(lambda e: self._update_3d(force=True) if e.new == self.TAB_3D and self._dirty_3d
+                          else None, "active")
         settings = pn.Accordion(
             ("Holder", pn.panel(holder_settings)),
             ("Pegboard and pegs", self.peg_panel),
