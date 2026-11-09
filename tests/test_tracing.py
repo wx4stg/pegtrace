@@ -42,16 +42,6 @@ def test_auto_down_angle_puts_heavy_end_down(hammer):
     assert o.centroid.y < (o.bounds[3] - o.bounds[1]) / 2
 
 
-def test_ring_vertices_drops_repeats():
-    from pegtrace.ui.trace import ring_vertices
-
-    # mid-drawing: the last point is repeated under the cursor
-    assert ring_vertices([0, 10, 10, 10], [0, 0, 5, 5]) == [(0.0, 0.0), (10.0, 0.0), (10.0, 5.0)]
-    # closed ring and NaN padding
-    assert ring_vertices([0, 10, 10, 0, float("nan")], [0, 0, 5, 0, 1]) == [(0.0, 0.0), (10.0, 0.0), (10.0, 5.0)]
-    assert ring_vertices([], []) == []
-
-
 def test_merge_close_vertices_makes_sharp_corners():
     from shapely.geometry import box
 

@@ -38,39 +38,17 @@ def test_full_ui_flow(app):
     assert len(export._project().getvalue()) > 1000
 
 
-def test_poly_draw_trace(app):
+def test_lasso_and_edit(app):
     state, steps = app.state, app.steps
     steps[0]._on_sample(None)
     steps[1]._on_apply(None)
-    trace = steps[2]
-    # PolyDraw sends the polygon after each click, with the last point repeated under the cursor
-    clicks = [(20, 20), (120, 25), (110, 200), (30, 190)]
-    xs, ys = [], []
-    for x, y in clicks:
-        xs.append(x)
-        ys.append(y)
-        trace._on_draw({"xs": [xs + [x]], "ys": [ys + [y]]})
+    steps[2]._on_lasso(np.array([[20, 20], [120, 25], [110, 200], [30, 190]], float))
     assert state.outline is not None and state.outline.area > 10000
-    assert trace.verts == [(20.0, 20.0), (120.0, 25.0), (110.0, 200.0), (30.0, 190.0)]
-    # PolyEdit: insert a vertex between 1 and 2 and drag it
-    v = list(trace.verts)
-    v.insert(2, (160.0, 112.0))
-    trace._on_draw({"xs": [[a for a, _ in v]], "ys": [[b for _, b in v]]})
-    assert len(state.outline.exterior.coords) - 1 == 5  # hand-placed points are not simplified away
-    assert abs(state.outline.bounds[2] - 160) < 1e-6
-    # delete it (Backspace)
-    del v[2]
-    trace._on_draw({"xs": [[a for a, _ in v]], "ys": [[b for _, b in v]]})
-    assert len(trace.verts) == 4 and state.outline.bounds[2] < 125
-    # too few points: no outline
-    trace._on_draw({"xs": [[10, 50]], "ys": [[10, 10]]})
-    assert len(trace.verts) == 2 and state.outline is None
-    trace._on_clear(None)
-    assert trace.verts == [] and len(trace.poly_pipe.data) == 0
-    # outlines from auto-detect show up as an editable polygon
-    trace._on_auto(None)
-    assert state.outline is not None and len(trace.verts) == len(state.outline.exterior.coords) - 1
-    assert len(trace.poly_pipe.data) == len(trace.verts)
+    steps[2]._on_edit({"xs": [[20, 120, 110, 60]], "ys": [[20, 25, 200, 210]]})
+    assert abs(state.outline.bounds[3] - 210) < 1e-6
+    assert state.simplify_tol > 0  # editing keeps the points but leaves the slider alone
+    steps[2].clear.clicks += 1
+    assert state.outline is None and len(steps[2].poly_pipe.data) == 0
 
 
 def test_corner_drag_updates_state(app):

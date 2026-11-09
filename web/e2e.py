@@ -11,7 +11,6 @@ Exits non-zero on the first failed check.
 from __future__ import annotations
 
 import argparse
-import re
 import functools
 import http.server
 import socket
@@ -188,85 +187,32 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
 
         rng = page.evaluate("""() => {
           const all = Bokeh.documents.flatMap(d => [...d.all_models]);
-          // newest plot with an x axis label in mm (replaced plots can linger in all_models)
-          const p = all.filter(m => m.toolbar && m.toolbar.tools.some(t => (t.type||t.constructor.name) === 'PolyDrawTool')
-                                  && m.below && m.below.some(a => a.axis_label === 'x (mm)')).pop();
+          // newest poly_select plot (replaced plots can linger in all_models)
+          const p = all.filter(m => m.toolbar && m.toolbar.tools.some(t => (t.type||t.constructor.name) === 'PolySelectTool')).pop();
           return p ? [p.x_range.start, p.x_range.end, p.y_range.start, p.y_range.end] : null;
         }""")
         r.check(rng is not None and rng[0] < 0 and rng[1] > 200 and rng[2] < 0 and rng[3] > 250,
                 f"trace plot shows the whole calibrated image (ranges {rng})")
-        print("step 3: trace with the polygon tools")
+        print("step 3: trace by hand with poly_select")
 
-        r.step = "step 3: trace with the polygon tools"
+        r.step = "step 3: trace by hand with poly_select"
         box = r.visible_canvas()
         r.check(box is not None, "trace plot canvas visible")
         cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
-        tools = """() => {
-          const all = Bokeh.documents.flatMap(d => [...d.all_models]);
-          const find = (n) => all.filter(m => (m.type||m.constructor.name) === n).pop();
-          const d = find('PolyDrawTool'), e = find('PolyEditTool');
-          const vx = e.vertex_renderer.data_source.data;
-          return {draw: d.active, edit: e.active, shown: (vx.get ? vx.get('x') : vx.x).length};
-        }"""
-
-        def hold(x, y):  # press and hold
-            page.mouse.move(x, y)
-            page.mouse.down()
-            page.wait_for_timeout(500)
-            page.mouse.up()
-            page.wait_for_timeout(150)
-
-        def stats() -> str:
-            return page.get_by_text(re.compile(r"mm, area .* vertices")).first.inner_text()
-
-        pts = [(cx + dx, cy + dy) for dx, dy in [(-60, -80), (70, -70), (80, 60), (-50, 90)]]
-        hold(*pts[0])
-        for x, y in pts[1:]:
-            page.mouse.click(x, y)
+        pts = [(-60, -80), (70, -70), (80, 60), (-50, 90)]
+        for dx, dy in pts:
+            page.mouse.click(cx + dx, cy + dy)
             page.wait_for_timeout(150)  # quick clicks: bokeh reports them as double taps (see fast_taps)
-        page.keyboard.press("Escape")
+        page.keyboard.press("Enter")  # bokeh 3 finishes poly_select with Enter or press-and-hold
         r.wait_text("4 vertices", timeout=60_000)
-        r.check(True, "drawn polygon reached Python")
-        t = page.evaluate(tools)
-        r.check(t["edit"] and not t["draw"] and t["shown"] == 4, f"edit tool took over with the vertices showing ({t})")
+        r.check(True, "hand-drawn polygon reached Python with every click")
         r.shot("hand_trace")
-        # drag a vertex outward
-        before = stats()
-        page.mouse.move(*pts[1])
-        page.mouse.down()
-        page.mouse.move(pts[1][0] + 40, pts[1][1], steps=8)
-        page.mouse.up()
-        for _ in range(240):
-            if stats() != before:
-                break
-            page.wait_for_timeout(250)
-        r.check("4 vertices" in stats(), f"dragged a vertex ({before} -> {stats()})")
-        # insert a point after vertex 2: press and hold it, click the new spot, Esc
-        mx, my = (pts[2][0] + pts[3][0]) / 2, (pts[2][1] + pts[3][1]) / 2 + 40
-        hold(*pts[2])
-        page.mouse.move(mx, my, steps=5)
-        page.mouse.click(mx, my)
-        page.keyboard.press("Escape")
-        r.wait_text("5 vertices", timeout=60_000)
-        r.check(page.evaluate(tools)["shown"] == 5, "inserted a vertex")
-        r.shot("hand_trace_edited")
-        # delete it: click it, Backspace
-        page.wait_for_timeout(300)
-        page.mouse.click(mx, my)
-        page.keyboard.press("Backspace")
-        r.wait_text("4 vertices", timeout=60_000)
-        r.check(True, "deleted a vertex")
         r.click("Clear")
-        r.wait_text("No outline yet.")
-        page.wait_for_timeout(1000)
-        t = page.evaluate(tools)
-        r.check(t["draw"] and not t["edit"] and t["shown"] == 0, f"Clear went back to the draw tool ({t})")
+        r.wait_text("No outline yet.", timeout=60_000)
+        r.check(True, "cleared the outline")
         r.click("Auto-detect outline")
         r.wait_text("Outline detected")
         page.wait_for_timeout(1500)
-        t = page.evaluate(tools)
-        n = int(stats().split(",")[-1].split()[0])
-        r.check(t["edit"] and t["shown"] == n, f"auto-detected outline is editable ({t}, {n} vertices)")
         r.shot("auto_trace")
         r.click("Use this outline")
 
