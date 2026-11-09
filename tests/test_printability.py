@@ -33,3 +33,11 @@ def test_flat_body_has_no_overhangs(hammer):
 def test_shelf_body_has_no_overhangs(hammer, sp):
     r = build_shelf(hammer, sp, PegboardParams())
     assert overhang_area(oriented(body_without_pegs(r), "print (upright)")) < 1.0
+
+
+def test_flat_ring_has_no_overhangs():
+    from shapely.geometry import box
+
+    t = box(-40, 100, 40, 120).union(box(-10, 0, 10, 100))
+    r = build_flat(t, FlatParams(style="ring"), PegboardParams())
+    assert overhang_area(oriented(body_without_pegs(r), "print (upright)")) < 1.0

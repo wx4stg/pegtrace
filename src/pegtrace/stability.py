@@ -33,14 +33,24 @@ def _overlap(a: Polygon, b) -> float:
     return a.intersection(b).area
 
 
-def rest_position(outline: Polygon, walls, max_drop: float = 50.0) -> tuple[Polygon, float]:
-    """Drop the outline straight down until it touches the walls."""
+def rest_position(outline: Polygon, walls, max_drop: float = 50.0, step: float = 0.5) -> tuple[Polygon, float]:
+    """Drop the outline straight down until it first touches the walls.
+
+    Steps down before bisecting: a thin ring of walls can be passed through entirely in
+    2D, so "overlaps at the full drop" says nothing about where the first contact is.
+    """
     if _overlap(outline, walls) > AREA_TOL:
         return outline, 0.0
-    lo, hi = 0.0, max_drop
-    if _overlap(affinity.translate(outline, 0, -hi), walls) <= AREA_TOL:
-        return affinity.translate(outline, 0, -hi), hi  # nothing below: falls through
-    for _ in range(30):
+    lo = 0.0
+    hi = None
+    for d in np.arange(step, max_drop + step / 2, step):
+        if _overlap(affinity.translate(outline, 0, -d), walls) > AREA_TOL:
+            hi = float(d)
+            break
+        lo = float(d)
+    if hi is None:
+        return affinity.translate(outline, 0, -max_drop), max_drop  # nothing below: falls through
+    for _ in range(20):
         mid = (lo + hi) / 2
         if _overlap(affinity.translate(outline, 0, -mid), walls) > AREA_TOL:
             hi = mid

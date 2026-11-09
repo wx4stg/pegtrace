@@ -28,7 +28,8 @@ locally with `panel serve`, or as a **fully static web page** with Python runnin
    - To delete a vertex, click it and press **Backspace**, or use *Remove last point*.
    - A slider smooths or simplifies the outline.
 4. **Orientation**: pick the mount style, then set the arrow.
-   - **Flat**: the object hangs against the board in a cradle. The arrow points *down*.
+   - **Flat**: the object hangs against the board, in a pocket-style cradle or (Design step) a ring
+     around a narrow part. The arrow points *down*.
    - **Shelf**: the outline becomes a pocket in a shelf that sticks out from the board. The arrow points
      *toward the board*.
    - *Auto* makes the long axis vertical, with the heavier end down.
@@ -56,6 +57,18 @@ rotated so that gravity points to −y.
 - **Stability check**: the outline is dropped onto the walls. The part then checks two things: whether the
   centroid sits between the contact points, and how far a bump can rotate the object about each contact
   before the walls catch it.
+
+**Flat mode, ring style**
+
+For objects with a wide part above a narrow one (a hammer head-up, a T, pliers by the joint), a full pocket
+isn't needed.
+- The ring top is placed automatically at the level where something above sticks out furthest past
+  everything below, relative to the ring's width. You can also place it at the pocket depth instead.
+- A band of walls, plus the back plate and a closed front bar, circles the narrow part. The wide part rests
+  on the band, and everything below hangs free through it.
+- The band's underside slopes back to the board at about 50° from horizontal, so it still prints upright
+  without supports.
+- *Auto* on the Orientation step picks whichever way up a ring can hold.
 
 **Shelf mode**
 - The footprint (grown by the clearance) is cut into a shelf slab, either as a pocket of the chosen depth or
@@ -126,7 +139,8 @@ Notes on the browser runtime:
 The end-to-end test drives every step with real clicks:
 - loads the sample photo and calibrates;
 - clicks an outline by hand, splits an edge and drags a vertex, then auto-detects the outline;
-- picks an orientation and checks the views, including Shelf mode;
+- picks an orientation and checks the views, including Shelf mode and the ring style;
+- switches to the dark theme;
 - downloads the STL;
 - saves the project and loads it back;
 - fails on any browser console error.

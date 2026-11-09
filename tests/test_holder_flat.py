@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from pegtrace.csg import Solid
 from pegtrace.export import read_stl, solid_stl
 from pegtrace.holder import oriented
 from pegtrace.holder_flat import build_flat
@@ -69,3 +70,51 @@ def test_suggest_pocket(hammer):
     fp, pb = FlatParams(), PegboardParams()
     pct = suggest_pocket_percent(hammer, fp, pb)
     assert pct is not None and 5 <= pct <= 95
+
+
+@pytest.fixture
+def letter_t():
+    """A T the right way up: a wide bar on top of a narrow stem."""
+    from shapely.geometry import box
+
+    return box(-40, 100, 40, 120).union(box(-10, 0, 10, 100))
+
+
+def test_ring_holds_t_by_its_bar(letter_t):
+    from pegtrace.holder_flat import ring_level
+
+    fp, pb = FlatParams(style="ring"), PegboardParams()
+    top, _ = ring_level(letter_t.buffer(fp.clear_xy), fp)
+    assert 97 < top < 99.5  # just under the bar (which is 1 mm lower with clearance)
+    r = build_flat(letter_t, fp, pb)
+    assert r.solid.is_valid() and r.solid.num_components() == 1
+    assert (r.solid & r.keepout).volume() == pytest.approx(0, abs=1e-6)
+    assert r.info["stable"] and not r.warnings
+    # much less material than a pocket around the whole stem and bar
+    pocket = build_flat(letter_t, FlatParams(pocket_percent=90), pb)
+    assert r.info["volume_cm3"] < 0.5 * pocket.info["volume_cm3"]
+    # the stem hangs free: nothing of the holder below the chamfer under the ring
+    lo, _ = Solid.union_all([s for k, s in r.parts.items() if k != "pegs"]).bounds()
+    assert lo[1] > 50
+
+
+def test_ring_upside_down_warns(letter_t):
+    from shapely import affinity
+
+    r = build_flat(affinity.rotate(letter_t, 180, origin=(0, 60)), FlatParams(style="ring"), PegboardParams())
+    assert any("No narrow part" in w for w in r.warnings)
+
+
+def test_auto_direction_prefers_ring_way_up(letter_t):
+    from pegtrace.state import AppState
+
+    st = AppState()
+    st.flat.style = "ring"
+    st.outline = letter_t  # bar up as traced
+    st.auto_direction()
+    o = st.oriented_outline()
+    assert o.centroid.y > (o.bounds[1] + o.bounds[3]) / 2  # heavy bar on top
+    st.flat.style = "pocket"
+    st.auto_direction()
+    o = st.oriented_outline()
+    assert o.centroid.y < (o.bounds[1] + o.bounds[3]) / 2  # heavier end down

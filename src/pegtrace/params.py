@@ -76,6 +76,14 @@ class PegboardParams(param.Parameterized):
 class FlatParams(param.Parameterized):
     """Holder that cradles the object flat against the pegboard."""
 
+    style = param.Selector(
+        default="pocket", objects=["pocket", "ring"],
+        doc="Pocket: a cradle around the bottom of the object. Ring: a band around a narrow part, "
+            "with a wider part above resting on it (hammer head, the bar of a T, pliers joint).",
+    )
+    ring_auto = param.Boolean(True, doc="Put the ring under the widest overhang automatically "
+                                         "(off: the ring top is at the pocket depth)")
+    ring_height = param.Number(10.0, bounds=(3, 60), step=0.5, doc="Height of the ring band (mm)")
     object_thickness = param.Number(
         20.0, bounds=(1, 200), step=0.5, doc="Object thickness perpendicular to the photo (mm)"
     )
@@ -131,6 +139,7 @@ _LABELS = {
         "tab_margin": "Plate margin around pegs (mm)",
     },
     FlatParams: {
+        "style": "Holder style", "ring_auto": "Place ring automatically", "ring_height": "Ring height (mm)",
         "object_thickness": "Object thickness (mm)", "clear_xy": "Gap around outline (mm)",
         "clear_z": "Extra depth (mm)", "wall": "Wall thickness (mm)", "back_t": "Back plate thickness (mm)",
         "pocket_mode": "Pocket depth in", "pocket_percent": "Pocket depth (% of height)",

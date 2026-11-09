@@ -150,8 +150,23 @@ class AppState(param.Parameterized):
             self.outline = p if not p.is_empty else None
 
     def auto_direction(self) -> None:
-        if self.outline is not None:
-            self.direction = auto_down_angle(self.outline)
+        """Long axis vertical. Pocket style: heavier end down. Ring style: whichever way up
+        has a narrow part under a wide part to hang it by (e.g. a T the right way up)."""
+        if self.outline is None:
+            return
+        angle = auto_down_angle(self.outline)
+        if self.mode == "flat" and self.flat.style == "ring":
+            from .holder_flat import ring_level
+
+            def score(a):
+                pc = orient_polygon(self.outline, a).buffer(self.flat.clear_xy, quad_segs=12)
+                found = ring_level(pc, self.flat)
+                return found[1] if found else -1.0
+
+            flipped = (angle + 180.0) % 360.0
+            if score(flipped) > score(angle):
+                angle = flipped
+        self.direction = angle
 
     def oriented_outline(self) -> Polygon | None:
         if self.outline is None:

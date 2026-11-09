@@ -278,6 +278,26 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
         r.tab("5 · Design")
         r.wait_text("Size:")
 
+        print("step 5c: ring style")
+
+        r.step = "step 5c: ring style"
+        page.locator("select:has(option:text-is('ring'))").first.select_option("ring")
+        r.wait_text("Place ring automatically", timeout=30_000)
+        r.tab("4 · Orientation")
+        r.click("Auto: long axis vertical")
+        page.wait_for_timeout(1500)
+        r.shot("ring_orientation")
+        r.tab("5 · Design")
+        r.wait_text("No problems found.", timeout=30_000)
+        r.check(True, "ring holder holds the T without warnings")
+        r.shot("ring_front")
+        r.tab("Side section")
+        r.shot("ring_side")
+        r.tab("3D")
+        page.wait_for_timeout(3000)
+        r.shot("ring_3d")
+        r.tab("Front")
+
         print("step 6: export")
 
         r.step = "step 6: export"

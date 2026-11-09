@@ -12,7 +12,9 @@ from .common import FILL_WINDOW, TABS_CSS, help_text, show, status_alert
 
 PEG_FIELDS = ["preset", "spacing", "hole_d", "board_t", "peg_clear", "board_clear", "hook_rise", "columns",
               "max_pegs", "stride", "add_pins", "pin_rows", "pin_length", "peg_profile", "tab_margin"]
-FLAT_FIELDS = ["object_thickness", "pocket_mode", "pocket_percent", "pocket_mm", "clear_xy", "clear_z", "wall",
+RING_FIELDS = ["style", "ring_auto", "ring_height", "object_thickness", "pocket_mode", "pocket_percent",
+               "pocket_mm", "clear_xy", "clear_z", "wall", "back_t", "lip_t"]
+FLAT_FIELDS = ["style", "object_thickness", "pocket_mode", "pocket_percent", "pocket_mm", "clear_xy", "clear_z", "wall",
                "back_t", "lip", "lip_overlap", "lip_t", "lip_height_percent", "flat_bottom", "notch", "notch_d"]
 SHELF_FIELDS = ["pocket_depth", "through", "floor_t", "clear_xy", "shelf_wall", "back_t", "rim_height", "rim_t",
                 "gussets", "gusset_t", "object_height"]
@@ -48,6 +50,11 @@ class DesignStep:
         self.next.on_click(lambda _: on_done() if on_done else None)
         self.peg_panel = param_panel(state.pegboard, PEG_FIELDS)
         self.flat_panel = param_panel(state.flat, FLAT_FIELDS)
+        self.ring_panel = param_panel(state.flat, RING_FIELDS)
+        self.ring_help = help_text("**Ring**: a band around a narrow part of the object, just below a wider "
+                                   "part that rests on it. Hang the object wide end up (*Auto* on the "
+                                   "Orientation step picks that way up). With *Place ring automatically* off, "
+                                   "the ring top is at the pocket depth. The front bar uses the lip thickness.")
         self.shelf_panel = param_panel(state.shelf, SHELF_FIELDS)
         state.param.watch(lambda e: self._update_3d(), "result")
         for w in (self.show_board, self.show_object):
@@ -90,8 +97,10 @@ class DesignStep:
     def view(self):
         state = self.state
 
-        @pn.depends(state.param.mode)
-        def holder_settings(mode):
+        @pn.depends(state.param.mode, state.flat.param.style)
+        def holder_settings(mode, style):
+            if mode == "flat" and style == "ring":
+                return pn.Column(self.ring_panel, self.ring_help, sizing_mode="stretch_width")
             if mode == "flat":
                 return pn.Column(self.flat_panel, self.suggest, sizing_mode="stretch_width")
             return pn.Column(self.shelf_panel, sizing_mode="stretch_width")
