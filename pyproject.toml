@@ -31,3 +31,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+filterwarnings = [
+    # Panel 1.10 renames (label/color); the browser build runs Panel 1.8, which lacks them
+    "ignore:.*is deprecated and will be removed in version 2.0:PendingDeprecationWarning",
+]

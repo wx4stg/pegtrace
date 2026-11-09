@@ -118,3 +118,35 @@ class ExportParams(param.Parameterized):
         doc="Print: bottom on the bed, needs no supports. As mounted: board plane is XY.",
     )
     filename = param.String("pegtrace_holder.stl")
+
+
+# Human-readable widget labels (pn.Param uses Parameter.label)
+_LABELS = {
+    PegboardParams: {
+        "preset": "Pegboard type", "spacing": "Hole spacing (mm)", "hole_d": "Hole diameter (mm)",
+        "board_t": "Board thickness (mm)", "peg_clear": "Peg clearance (mm)", "board_clear": "Extra peg length (mm)",
+        "hook_rise": "Hook rise (mm)", "columns": "Peg columns (0 = auto)", "max_pegs": "Max columns (auto)",
+        "stride": "Use every Nth hole", "add_pins": "Anti-tilt pins", "pin_rows": "Pins: holes below hooks",
+        "pin_length": "Pin length (mm, 0 = auto)", "peg_profile": "Peg profile",
+        "tab_margin": "Plate margin around pegs (mm)",
+    },
+    FlatParams: {
+        "object_thickness": "Object thickness (mm)", "clear_xy": "Gap around outline (mm)",
+        "clear_z": "Extra depth (mm)", "wall": "Wall thickness (mm)", "back_t": "Back plate thickness (mm)",
+        "pocket_mode": "Pocket depth in", "pocket_percent": "Pocket depth (% of height)",
+        "pocket_mm": "Pocket depth (mm)", "lip": "Front lip", "lip_overlap": "Lip overlap (mm)",
+        "lip_t": "Lip thickness (mm)", "lip_height_percent": "Lip height (% of pocket)",
+        "flat_bottom": "Flat bottom (print upright)", "notch": "Thumb notch", "notch_d": "Notch diameter (mm)",
+    },
+    ShelfParams: {
+        "clear_xy": "Gap around outline (mm)", "pocket_depth": "Pocket depth (mm)",
+        "floor_t": "Floor thickness (mm)", "through": "Cut all the way through", "shelf_wall": "Shelf margin (mm)",
+        "back_t": "Back plate thickness (mm)", "rim_height": "Rim height (mm, 0 = none)",
+        "rim_t": "Rim thickness (mm)", "gussets": "Support gussets", "gusset_t": "Gusset thickness (mm)",
+        "object_height": "Object height (preview, mm)",
+    },
+    ExportParams: {"orientation": "STL orientation", "filename": "File name"},
+}
+for _cls, _labels in _LABELS.items():
+    for _name, _label in _labels.items():
+        _cls.param[_name].label = _label

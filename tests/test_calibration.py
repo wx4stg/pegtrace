@@ -42,3 +42,13 @@ def test_two_point_scale():
     cal = scale_two_points(img, (100, 100), (600, 100), 250.0)
     assert cal.bounds == pytest.approx((0, 0, 500, 250))
     assert np.allclose(cal.px_to_mm([(100, 500)]), [(50, 0)])
+
+
+def test_find_paper_corners(sample):
+    from pegtrace.calibration import find_rectangle_corners
+
+    path, truth = sample
+    found = find_rectangle_corners(Image.open(path))
+    assert found is not None
+    err = np.linalg.norm(found - np.asarray(truth["corners_px"], float), axis=1)
+    assert err.max() < 8, err

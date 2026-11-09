@@ -163,3 +163,46 @@ def scale_two_points(img: Image.Image, p1, p2, distance_mm: float, max_px: int =
         h_px_to_mm=hmat,
         notes=["two-point scale assumes the camera looked straight down"],
     )
+
+
+def find_rectangle_corners(img: Image.Image, work_px: int = 800, min_frac: float = 0.05) -> np.ndarray | None:
+    """Guess the 4 corners (photo pixels, TL/TR/BR/BL) of the brightest large
+    region, i.e. a sheet of paper. Returns None when nothing plausible is found.
+    """
+    from contourpy import contour_generator
+    from PIL import ImageFilter
+    from shapely.geometry import MultiPoint, Polygon
+
+    k = min(1.0, work_px / max(img.size))
+    small = img.convert("L")
+    if k < 1.0:
+        small = small.resize((max(int(img.size[0] * k), 1), max(int(img.size[1] * k), 1)), Image.Resampling.BILINEAR)
+    small = small.filter(ImageFilter.GaussianBlur(2))
+    g = np.asarray(small, dtype=float)
+    hist, edges = np.histogram(g, bins=256, range=(0, 256))
+    centers = (edges[:-1] + edges[1:]) / 2
+    w0 = np.cumsum(hist)
+    w1 = w0[-1] - w0
+    m0 = np.cumsum(hist * centers)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        between = np.nan_to_num(w0 * w1 * (m0 / w0 - (m0[-1] - m0) / w1) ** 2)
+    thr = centers[int(np.argmax(between))]
+    mask = np.pad((g > thr).astype(float), 1)
+    best = None
+    for line in contour_generator(z=mask).lines(0.5):
+        if len(line) < 4:
+            continue
+        p = Polygon(line - 1.0)
+        if not p.is_valid:
+            p = p.buffer(0)
+        if best is None or p.area > best.area:
+            best = p
+    if best is None or best.area < min_frac * g.size:
+        return None
+    hull = np.asarray(MultiPoint(np.asarray(best.exterior.coords) if best.geom_type == "Polygon"
+                                 else np.asarray(best.convex_hull.exterior.coords)).convex_hull.exterior.coords)
+    s, d = hull.sum(axis=1), hull[:, 0] - hull[:, 1]
+    quad = np.array([hull[np.argmin(s)], hull[np.argmax(d)], hull[np.argmax(s)], hull[np.argmin(d)]])
+    if Polygon(quad).area < 0.5 * best.area:
+        return None
+    return quad / k
