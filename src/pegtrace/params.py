@@ -77,9 +77,9 @@ class FlatParams(param.Parameterized):
     """Holder that cradles the object flat against the pegboard."""
 
     style = param.Selector(
-        default="pocket", objects=["pocket", "ring"],
-        doc="Pocket: a cradle around the bottom of the object. Ring: a band around a narrow part, "
-            "with a wider part above resting on it (hammer head, the bar of a T, pliers joint).",
+        default="ring", objects=["ring", "pocket"],
+        doc="Ring: a band around a narrow part, with a wider part above resting on it (hammer head, "
+            "the bar of a T, pliers joint). Pocket: a cradle around the bottom of the object.",
     )
     ring_auto = param.Boolean(True, doc="Put the ring under the widest overhang automatically "
                                          "(off: the ring top is at the pocket depth)")

@@ -29,11 +29,12 @@ locally with `panel serve`, or as a **fully static web page** with Python runnin
    - Drag the red vertices to refine the outline. A slider smooths or simplifies it; edited points are kept
      exactly.
 4. **Orientation**: pick the mount style, then set the arrow.
-   - **Flat**: the object hangs against the board, in a pocket-style cradle or (Design step) a ring
-     around a narrow part. The arrow points *down*.
+   - **Flat**: the object hangs against the board, held by a ring around a narrow part (the default) or
+     (Design step) a pocket-style cradle. The arrow points *down*.
    - **Shelf**: the outline becomes a pocket in a shelf that sticks out from the board. The arrow points
      *toward the board*.
-   - *Auto* makes the long axis vertical, with the heavier end down.
+   - *Auto* makes the long axis vertical. For the ring style it picks the way up that has a wide part
+     resting on a narrow one; for the pocket style, the heavier end goes down.
 5. **Design**: adjust the holder and pegboard settings.
    - Front, side-section, top and 3D views update live.
    - Warnings flag a shallow pocket, a single hook, an object that can tip out, and similar problems.
@@ -59,7 +60,7 @@ rotated so that gravity points to −y.
   centroid sits between the contact points, and how far a bump can rotate the object about each contact
   before the walls catch it.
 
-**Flat mode, ring style**
+**Flat mode, ring style (default)**
 
 For objects with a wide part above a narrow one (a hammer head-up, a T, pliers by the joint), a full pocket
 isn't needed.

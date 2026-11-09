@@ -11,7 +11,7 @@ from pegtrace.stability import check_flat, suggest_pocket_percent
 
 @pytest.mark.parametrize("lip,flat_bottom,notch", [(True, True, False), (False, False, True), (True, False, True)])
 def test_flat_is_single_valid_solid(hammer, lip, flat_bottom, notch):
-    fp = FlatParams(lip=lip, flat_bottom=flat_bottom, notch=notch)
+    fp = FlatParams(style="pocket", lip=lip, flat_bottom=flat_bottom, notch=notch)
     r = build_flat(hammer, fp, PegboardParams())
     assert r.solid.is_valid()
     assert r.solid.num_components() == 1
@@ -22,7 +22,7 @@ def test_flat_is_single_valid_solid(hammer, lip, flat_bottom, notch):
 
 def test_pegs_on_grid(hammer):
     pb = PegboardParams(preset="US 1/8 in hardboard (1 in grid, 3/16 in holes)")
-    r = build_flat(hammer, FlatParams(), pb)
+    r = build_flat(hammer, FlatParams(style="pocket"), pb)
     pts = np.array(r.pegs.points)
     rel = (pts - pts[0]) / pb.spacing
     assert np.allclose(rel, np.round(rel), atol=1e-9)
@@ -39,7 +39,7 @@ def test_flat_bottom_prints_upright(hammer):
 
 
 def test_stl_roundtrip(hammer):
-    r = build_flat(hammer, FlatParams(), PegboardParams())
+    r = build_flat(hammer, FlatParams(style="pocket"), PegboardParams())
     data = solid_stl(r.solid)
     normals, tris = read_stl(data)
     verts, faces = r.solid.to_mesh()
@@ -67,7 +67,7 @@ def test_stability_flags_off_balance_shape(gamma):
 
 
 def test_suggest_pocket(hammer):
-    fp, pb = FlatParams(), PegboardParams()
+    fp, pb = FlatParams(style="pocket"), PegboardParams()
     pct = suggest_pocket_percent(hammer, fp, pb)
     assert pct is not None and 5 <= pct <= 95
 
@@ -91,7 +91,7 @@ def test_ring_holds_t_by_its_bar(letter_t):
     assert (r.solid & r.keepout).volume() == pytest.approx(0, abs=1e-6)
     assert r.info["stable"] and not r.warnings
     # much less material than a pocket around the whole stem and bar
-    pocket = build_flat(letter_t, FlatParams(pocket_percent=90), pb)
+    pocket = build_flat(letter_t, FlatParams(style="pocket", pocket_percent=90), pb)
     assert r.info["volume_cm3"] < 0.5 * pocket.info["volume_cm3"]
     # the stem hangs free: nothing of the holder below the chamfer under the ring
     lo, _ = Solid.union_all([s for k, s in r.parts.items() if k != "pegs"]).bounds()
