@@ -1,9 +1,10 @@
-"""Step 5: holder settings with live 2D views, warnings and a 3D view."""
+"""Step 5: holder settings, a 2D and 3D preview of the holder, and warnings."""
 
 from __future__ import annotations
 
 import holoviews as hv
 import panel as pn
+import param
 
 from ..preview import front_view, scene_archive, side_view, top_view_plot
 from ..state import AppState
@@ -22,7 +23,15 @@ PLA_DENSITY = 1.24  # g/cm³
 
 
 def param_panel(obj, fields, **kw):
-    return pn.Param(obj, parameters=fields, show_name=False, sizing_mode="stretch_width", **kw)
+    """Widgets for ``fields`` of ``obj``; numbers get a slider plus a box to type the value."""
+    widgets = {}
+    for f in fields:
+        p = obj.param[f]
+        if isinstance(p, param.Integer):
+            widgets[f] = pn.widgets.EditableIntSlider
+        elif isinstance(p, param.Number):
+            widgets[f] = pn.widgets.EditableFloatSlider
+    return pn.Param(obj, parameters=fields, widgets=widgets, show_name=False, sizing_mode="stretch_width", **kw)
 
 
 class DesignStep:

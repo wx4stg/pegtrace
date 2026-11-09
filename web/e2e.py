@@ -255,6 +255,16 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
         r.wait_text("No problems found.", timeout=30_000)
         r.check(page.get_by_text("Place ring automatically").first.is_visible(),
                 "ring style by default, and the ring holder holds the T without warnings")
+        # type a value instead of dragging the slider (the first number box is the ring height)
+        box = page.get_by_role("textbox").locator("visible=true").first
+        r.check(box.input_value() == "10", f"ring height has a box to type in ({box.input_value()!r})")
+        box.fill("14")
+        box.press("Enter")
+        r.wait_text("Settings changed", timeout=30_000)
+        r.click("Update holder")
+        page.wait_for_function("t => !document.body.innerText.includes(t)", arg="Settings changed", timeout=120_000)
+        r.wait_text("No problems found.", timeout=120_000)
+        r.check(True, "typed ring height applied with Update holder")
         page.wait_for_timeout(1500)
         r.shot("design_front")
         r.tab("Side section")

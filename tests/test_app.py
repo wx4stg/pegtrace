@@ -73,3 +73,12 @@ def test_design_update_button(app):
     assert state.stale and not design.update.disabled and state.result.info["volume_cm3"] == v0
     design.update.clicks += 1
     assert not state.stale and design.update.disabled and state.result.info["volume_cm3"] > v0
+
+
+def test_design_numbers_can_be_typed(app):
+    design = app.steps[4]
+    panel = design.ring_panel
+    assert isinstance(panel._widgets["ring_height"], pn.widgets.EditableFloatSlider)
+    assert isinstance(design.peg_panel._widgets["columns"], pn.widgets.EditableIntSlider)
+    panel._widgets["ring_height"].value = 17.5  # typed into the box
+    assert app.state.flat.ring_height == 17.5 and app.state.stale
