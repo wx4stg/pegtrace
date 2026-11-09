@@ -39,5 +39,5 @@ def test_flat_ring_has_no_overhangs():
     from shapely.geometry import box
 
     t = box(-40, 100, 40, 120).union(box(-10, 0, 10, 100))
-    r = build_flat(t, FlatParams(style="ring"), PegboardParams())
+    r = build_flat(t, FlatParams(style="ring", ring_top=99), PegboardParams())
     assert overhang_area(oriented(body_without_pegs(r), "print (upright)")) < 1.0

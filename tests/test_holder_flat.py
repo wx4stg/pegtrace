@@ -56,7 +56,7 @@ def test_stl_roundtrip(hammer):
 
 def test_stability_flags_off_balance_shape(gamma):
     pb = PegboardParams()
-    good = build_flat(gamma, FlatParams(pocket_percent=60), pb)
+    good = build_flat(gamma, FlatParams(style="pocket", pocket_percent=60), pb)
     assert good.info["stable"]
     # without walls on the tipping side the arm drags it out
     from shapely.geometry import box
@@ -83,9 +83,9 @@ def letter_t():
 def test_ring_holds_t_by_its_bar(letter_t):
     from pegtrace.holder_flat import ring_level
 
-    fp, pb = FlatParams(style="ring"), PegboardParams()
-    top, _ = ring_level(letter_t.buffer(fp.clear_xy), fp)
-    assert 97 < top < 99.5  # just under the bar (which is 1 mm lower with clearance)
+    fp, pb = FlatParams(style="ring", ring_top=99), PegboardParams()  # just under the bar, less clearance
+    top, _ = ring_level(letter_t.buffer(fp.clear_xy), fp)  # Auto orientation's measure agrees
+    assert 97 < top < 99.5
     r = build_flat(letter_t, fp, pb)
     assert r.solid.is_valid() and r.solid.num_components() == 1
     assert (r.solid & r.keepout).volume() == pytest.approx(0, abs=1e-6)
@@ -102,7 +102,46 @@ def test_ring_upside_down_warns(letter_t):
     from shapely import affinity
 
     r = build_flat(affinity.rotate(letter_t, 180, origin=(0, 60)), FlatParams(style="ring"), PegboardParams())
-    assert any("No narrow part" in w for w in r.warnings)
+    assert any("slide through" in w and "wide end up" in w for w in r.warnings)
+    # inside the bar: the warning points to just under it
+    r = build_flat(letter_t, FlatParams(style="ring", ring_top=110), PegboardParams())
+    assert any("slide through" in w and "starts at 99 mm" in w for w in r.warnings)
+
+
+def test_ring_rest_with_a_tilted_bar(letter_t):
+    from shapely import affinity
+
+    from pegtrace.holder_flat import ring_rest, suggest_ring_top
+
+    from shapely.geometry import box
+
+    fp = FlatParams(style="ring")
+    bar = affinity.rotate(box(-40, 100, 40, 120), 4, origin=(0, 110))  # left end lower
+    pc = bar.union(box(-10, 0, 10, 108)).buffer(fp.clear_xy)
+    top = suggest_ring_top(pc, 40, fp)
+    # the ring stops under the bar's lowest corner, so only the stem is inside it
+    assert top == pytest.approx(bar.bounds[1] - fp.clear_xy, abs=0.3)
+    assert below_width(pc, top) < 23
+    assert ring_rest(pc, top, fp) == pytest.approx(top, abs=0.3)
+
+
+def below_width(pc, y):
+    from pegtrace.geom2d import below
+
+    b = below(pc, y).bounds
+    return b[2] - b[0]
+
+
+def test_ring_top_too_low_says_where_to_put_it(letter_t):
+    r = build_flat(letter_t, FlatParams(style="ring", ring_top=60), PegboardParams())
+    msg = [w for w in r.warnings if "slide down" in w]
+    assert msg and "39 mm" in msg[0] and "set the ring top to 99 mm" in msg[0]
+    assert not any("falls through" in w for w in r.warnings)  # the stability check agrees: it rests
+    r = build_flat(letter_t, FlatParams(style="ring", ring_top=20), PegboardParams())  # a 79 mm slide
+    assert any("slide down 79 mm" in w for w in r.warnings)
+    assert not any("falls through" in w for w in r.warnings)
+    r = build_flat(letter_t, FlatParams(style="ring", ring_top=99), PegboardParams())
+    assert not any("slide" in w for w in r.warnings)
 
 
 def test_auto_direction_prefers_ring_way_up(letter_t):

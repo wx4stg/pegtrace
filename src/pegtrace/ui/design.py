@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import holoviews as hv
+import numpy as np
 import panel as pn
 import param
 
+from ..plotting import equal_aspect
 from ..preview import front_view, scene_archive, side_view, top_view_plot
 from ..state import AppState
 from ..vtkjs import scene_pane
@@ -14,8 +16,7 @@ from .diagrams import SKETCHES
 
 PEG_FIELDS = ["preset", "spacing", "hole_d", "board_t", "peg_clear", "board_clear", "hook_rise", "columns",
               "max_pegs", "stride", "add_pins", "pin_rows", "pin_length", "peg_profile", "tab_margin"]
-RING_FIELDS = ["style", "ring_auto", "ring_height", "object_thickness", "pocket_mode", "pocket_percent",
-               "pocket_mm", "clear_xy", "clear_z", "wall", "back_t", "lip_t"]
+RING_FIELDS = ["style", "ring_top", "ring_height", "object_thickness", "clear_xy", "clear_z", "wall", "back_t", "lip_t"]
 FLAT_FIELDS = ["style", "object_thickness", "pocket_mode", "pocket_percent", "pocket_mm", "clear_xy", "clear_z", "wall",
                "back_t", "lip", "lip_overlap", "lip_t", "lip_height_percent", "flat_bottom", "notch", "notch_d"]
 SHELF_FIELDS = ["pocket_depth", "through", "floor_t", "clear_xy", "shelf_wall", "back_t", "rim_height", "rim_t",
@@ -76,12 +77,64 @@ class DesignStep:
         self.ring_panel = param_panel(state.flat, RING_FIELDS)
         self.ring_help = help_text("**Ring**: a band around a narrow part of the object, just below a wider "
                                    "part that rests on it. Hang the object wide end up (*Auto* on the "
-                                   "Orientation step picks that way up). With *Place ring automatically* off, "
-                                   "the ring top is at the pocket depth. The front bar uses the lip thickness.")
+                                   "Orientation step picks that way up). Set *Ring top* to the height on the "
+                                   "object where the wide part should sit, or click that height in the "
+                                   "**Front** view; the dashed red line shows it. The front bar uses the lip "
+                                   "thickness.")
+        # the ring top on the front view: moves with the setting at once (no rebuild needed),
+        # and a click on the view sets it
+        # The ring top on the front view: a plain Bokeh line moved straight from Python, so
+        # it follows the setting at once (no rebuild) without HoloViews redrawing the plot
+        # (which made BokehJS 3.9 lose the legend). A click on the view sets it.
+        self.ring_marks = None  # (Span, Label) of the current front plot
+        self.ring_tap = None  # recreated with each front view
+        state.flat.param.watch(lambda e: self._move_ring_marks(), ["ring_top", "style"])
+        state.param.watch(lambda e: self._move_ring_marks(), ["mode", "outline", "direction"])
+        state.param.watch(lambda e: self._fit_ring_slider(), ["outline", "direction"])
+        self._fit_ring_slider()
         self.shelf_panel = param_panel(state.shelf, SHELF_FIELDS)
         state.param.watch(lambda e: self._update_3d(), "result")
         for w in (self.show_board, self.show_object):
             w.param.watch(lambda e: self._update_3d(force=True), "value")
+
+    def _ring_on(self) -> bool:
+        return self.state.mode == "flat" and self.state.flat.style == "ring"
+
+    def _ring_hook(self, plot, element):
+        """HoloViews hook: add the ring top line and its label to a new front plot."""
+        from bokeh.models import Label, Span
+
+        if getattr(plot, "_ring_marks", None) is None:
+            span = Span(location=0, dimension="width", line_color="#e15759", line_dash="dashed", line_width=2)
+            label = Label(x=0, y=0, text="ring top", text_color="#e15759", text_font_size="10pt",
+                          x_offset=4, y_offset=2)
+            plot.state.add_layout(span)
+            plot.state.add_layout(label)
+            plot._ring_marks = (span, label)
+        self.ring_marks = plot._ring_marks
+        self._move_ring_marks()
+
+    def _move_ring_marks(self):
+        if self.ring_marks is None:
+            return
+        span, label = self.ring_marks
+        o = self.state.oriented_outline()
+        on = self._ring_on() and o is not None
+        y = float(self.state.flat.ring_top)  # the oriented object's lowest point is y = 0
+        span.update(location=y, visible=on)
+        label.update(x=float(o.bounds[2]) if o is not None else 0.0, y=y, visible=on)
+
+    def _on_front_tap(self, x=None, y=None):
+        if y is None or not self._ring_on():
+            return
+        self.state.flat.ring_top = min(max(round(float(y) * 2) / 2, 0.5), 1000.0)
+
+    def _fit_ring_slider(self):
+        """The ring top slider spans the object's height."""
+        o = self.state.oriented_outline()
+        if o is None:
+            return
+        self.ring_panel._widgets["ring_top"].end = max(1.0, float(np.ceil(o.bounds[3] - o.bounds[1])))
 
     def _update_3d(self, force=False):
         """Refresh the 3D view, but only while its tab is showing, and debounced: replacing
@@ -165,7 +218,12 @@ class DesignStep:
 
         @pn.depends(state.param.result)
         def front(result):
-            return front_view(result, state.pegboard) if result is not None else placeholder()
+            if result is None:
+                return placeholder()
+            el = front_view(result, state.pegboard).opts(hv.opts.Overlay(hooks=[equal_aspect, self._ring_hook]))
+            self.ring_tap = hv.streams.Tap(source=el, transient=True)  # click to set the ring top
+            self.ring_tap.add_subscriber(self._on_front_tap)
+            return el
 
         @pn.depends(state.param.result)
         def side(result):

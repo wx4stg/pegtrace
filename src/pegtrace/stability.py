@@ -84,7 +84,10 @@ def check_flat(outline: Polygon, walls) -> StabilityReport:
     walls = clean(walls)
     if walls.is_empty:
         return StabilityReport(False, messages=["No walls to hold the object."])
-    rest, drop = rest_position(outline, walls)
+    # search as far down as the object is tall: a ring set too low lets it slide a long way
+    # before resting (that gets its own warning); further than that, it has left the holder
+    _, y0, _, y1 = outline.bounds
+    rest, drop = rest_position(outline, walls, max_drop=max(50.0, y1 - y0))
     contacts = contact_points(rest, walls)
     if len(contacts) == 0:
         return StabilityReport(False, rest_drop=drop,

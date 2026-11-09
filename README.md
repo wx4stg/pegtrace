@@ -69,8 +69,9 @@ rotated so that gravity points to −y.
 
 For objects with a wide part above a narrow one (a hammer head-up, a T, pliers by the joint), a full pocket
 isn't needed.
-- The ring top is placed automatically at the level where something above sticks out furthest past
-  everything below, relative to the ring's width. You can also place it at the pocket depth instead.
+- You set the ring top: the height on the object where its wide part should sit (type it, or click that
+  height in the Front view, where a dashed line shows it). If the object would slide down before its wide
+  part meets the ring, or slide right through, a warning says so and suggests the height that holds it.
 - A band of walls, plus the back plate and a closed front bar, circles the narrow part. The wide part rests
   on the band, and everything below hangs free through it.
 - The band's underside slopes back to the board at about 50° from horizontal, so it still prints upright

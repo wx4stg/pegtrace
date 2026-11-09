@@ -51,13 +51,18 @@ class Sketch:
                           f'{style}>{escape(s)}</text>')
 
     # -- dimensions ---------------------------------------------------------------------
-    def dim(self, x1, y1, x2, y2, label, lx=None, ly=None, anchor="middle"):
-        """A dimension line with arrows at both ends and its label (default: at the middle)."""
+    def dim(self, x1, y1, x2, y2, label, lx=None, ly=None, anchor="middle", vertical=False):
+        """A dimension line with arrows at both ends and its label (default: at the middle).
+        ``vertical`` writes the label along a vertical line, reading upwards."""
         self.items.append(f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{DIM}" stroke-width="1.2" '
                           f'marker-start="url(#pt-arrow)" marker-end="url(#pt-arrow)"/>')
         if lx is None:
             lx, ly = (x1 + x2) / 2, (y1 + y2) / 2 - 4
-        self.text(lx, ly, label, anchor=anchor, color=DIM, size=10)
+        if vertical:
+            self.items.append(f'<text x="{lx}" y="{ly}" text-anchor="middle" font-size="10" fill="{DIM}" '
+                              f'transform="rotate(-90 {lx} {ly})">{escape(label)}</text>')
+        else:
+            self.text(lx, ly, label, anchor=anchor, color=DIM, size=10)
 
     def leader(self, x1, y1, x2, y2, label, anchor="start"):
         """A label at (x2, y2) pointing at (x1, y1)."""
@@ -132,11 +137,15 @@ def ring_sketch() -> str:
     front.line(118, bot + 2, 118, bot + 30, dash=True, sw=0.6)
     front.line(138, bot + 16, 138, bot + 44, dash=True, sw=0.6)
     front.line(150, bot + 2, 150, bot + 44, dash=True, sw=0.6)
-    front.leader(222, top + 7, 262, top - 2, "front bar")
-    front.leader(170, 160, 228, 170, "back plate + pegs")
+    front.leader(222, top + 7, 264, top - 14, "front bar")
+    front.leader(170, 160, 104, 190, "back plate + pegs", anchor="end")
     front.text(170, 46, "wide part rests on the ring", size=9, color="#fff")
-    front.text(4, 236, "Place ring automatically: the ring top goes just under the wide part.", anchor="start",
-               size=9, italic=True)
+    # ring top: measured up from the object's lowest point
+    front.line(222, top, 316, top, dash=True, sw=0.6)
+    front.line(190, 226, 316, 226, dash=True, sw=0.6)
+    front.dim(310, 226, 310, top, "Ring top: height on the object", 322, (top + 226) / 2, vertical=True)
+    front.text(4, 236, "Set the ring top just under the wide part (or click it in the Front view).",
+               anchor="start", size=9, italic=True)
     side = Sketch(220, "Ring: side section")
     _side_section(side, 64, 106, "Lip thickness")
     side.text(194, side.h - 32, "(front bar)", anchor="start", size=9, color=DIM)

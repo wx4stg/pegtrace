@@ -12,7 +12,8 @@ Ring style: instead of a pocket around the bottom of the object, a band of
 walls (plus the back plate and a closed front bar) circles a narrow part of
 the object just below a wider part, which rests on it. Everything below the
 ring hangs free. The underside of the ring is chamfered at 45 degrees back to
-the board so it still prints upright without supports.
+the board so it still prints upright without supports. The user sets the ring's
+top: the height on the object where the wide part should rest.
 """
 
 from __future__ import annotations
@@ -43,7 +44,7 @@ class FlatRegions:
     pegs: PegLayout
     style: str = "pocket"
     ring_bottom: float | None = None  # ring style: bottom of the band
-    ring_found: bool = True  # ring style: an automatic ring level was found
+    ring_rest: float | None = None  # ring style: where the object's wide part meets the ring (None: nowhere)
 
 
 def pocket_top(pc: Polygon, fp: FlatParams) -> float:
@@ -58,6 +59,8 @@ CHAMFER_SLOPE = 1.2  # rise per run of the ring's underside: about 50 degrees, p
 
 def ring_level(pc: Polygon, fp: FlatParams) -> tuple[float, float] | None:
     """Best height for the top of a ring around ``pc`` (clearance outline), and its score.
+    Auto orientation uses the score to pick the way up for the ring style; the ring itself
+    goes where the user puts it (``FlatParams.ring_top``).
 
     At each level y the ring must let everything below y pass through it (the x extent
     of ``pc`` below y), and something just above y must stick out past that on both
@@ -86,9 +89,38 @@ def ring_level(pc: Polygon, fp: FlatParams) -> tuple[float, float] | None:
     return best
 
 
+def ring_rest(pc: Polygon, top: float, fp: FlatParams) -> float | None:
+    """Where an object (clearance outline ``pc``) sliding down through a ring whose top is at
+    ``top`` comes to rest: the lowest point of the parts that stick out past the ring's opening
+    (the x extent of ``pc`` below ``top``, which must all pass through). None: it slides through.
+    """
+    lower = below(pc, top)
+    if lower.is_empty:
+        return None
+    lo_x0, _, lo_x1, _ = lower.bounds
+    _, y0, _, y1 = pc.bounds
+    s = max(1.0, fp.wall / 2)  # overhang needed to rest on the ring rather than slip past it
+    over = clean(pc.difference(rect(lo_x0 - s, y0 - 1, lo_x1 + s, y1 + 1)))
+    return None if over.is_empty else float(max(over.bounds[1], top))
+
+
+def suggest_ring_top(pc: Polygon, start: float, fp: FlatParams) -> float | None:
+    """A ring top at or above ``start`` that the object rests on without sliding: move up to
+    where it would come to rest until that settles (the opening can widen on the way)."""
+    top = start
+    for _ in range(8):
+        rest = ring_rest(pc, top, fp)
+        if rest is None:
+            return None
+        if rest - top < 0.25:
+            return top
+        top = rest
+    return top
+
+
 def _ring_regions(outline: Polygon, pc: Polygon, u, fp: FlatParams, pb: PegboardParams) -> FlatRegions:
-    found = ring_level(pc, fp) if fp.ring_auto else None
-    top = found[0] if found else pocket_top(pc, fp)
+    y0, y1 = outline.bounds[1], outline.bounds[3]
+    top = min(max(y0 + fp.ring_top, y0 + 0.5), y1)
     bottom = top - fp.ring_height
     band = rect(pc.bounds[0] - BIG, bottom, pc.bounds[2] + BIG, top)
     ring = clean(below(pc, top).buffer(fp.wall, quad_segs=12).intersection(band))
@@ -106,7 +138,7 @@ def _ring_regions(outline: Polygon, pc: Polygon, u, fp: FlatParams, pb: Pegboard
     back = union([ring, tab])
     return FlatRegions(outline=outline, grown=pc, keepout=u, pocket_top=top, lip_top=top, y_floor=y_floor,
                        back=back, walls=walls, lip=ring, pegs=layout, style="ring", ring_bottom=bottom,
-                       ring_found=found is not None or not fp.ring_auto)
+                       ring_rest=ring_rest(pc, top, fp))
 
 
 def flat_regions(outline: Polygon, fp: FlatParams, pb: PegboardParams) -> FlatRegions:
@@ -183,9 +215,22 @@ def build_flat(outline: Polygon, fp: FlatParams, pb: PegboardParams) -> HolderRe
     stab = check_flat(outline, reg.walls)
     warnings.extend(stab.messages)
     if reg.style == "ring":
-        if not reg.ring_found:
-            warnings.append("No narrow part with a wider part above it was found, so the ring sits at the "
-                            "pocket depth. Turn the object so its wide end is up, or use the pocket style.")
+        y0 = outline.bounds[1]
+
+        def as_setting(y):  # a level in the frame -> the Ring top setting, rounded down to 0.5 mm
+            return f"{np.floor((y - y0) * 2) / 2:g}"
+
+        if reg.ring_rest is None:
+            low = suggest_ring_top(reg.grown, y0 + 0.5, fp)
+            hint = (f" The lowest wide part starts at {as_setting(low)} mm: try that as the ring top."
+                    if low is not None else " Turn the object wide end up, or use the pocket style.")
+            warnings.append("Nothing above the ring top sticks out past the part inside the ring, so the "
+                            "object would slide through." + hint)
+        elif reg.ring_rest - reg.pocket_top > 1.0:
+            fit = suggest_ring_top(reg.grown, reg.pocket_top, fp) or reg.ring_rest
+            warnings.append(f"The object will slide down {reg.ring_rest - reg.pocket_top:.0f} mm before its "
+                            f"wider part rests on the ring. To hold it where it is, set the ring top to "
+                            f"{as_setting(fit)} mm.")
     elif reg.pocket_top - reg.grown.bounds[1] < 2 * fp.wall:
         warnings.append("Pocket is very shallow; increase the pocket depth.")
     if len(reg.pegs.hooks) == 1 and not reg.pegs.pins:

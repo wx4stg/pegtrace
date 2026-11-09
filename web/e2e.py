@@ -252,20 +252,38 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
 
         r.step = "step 5: design"
         r.wait_text("Size:")
-        r.wait_text("No problems found.", timeout=30_000)
-        r.check(page.get_by_text("Place ring automatically").first.is_visible(),
-                "ring style by default, and the ring holder holds the T without warnings")
-        r.check(page.get_by_text("Ring: front view").first.is_visible(), "diagram of the ring settings shows")
-        # type a value instead of dragging the slider (the first number box is the ring height)
-        box = page.get_by_role("textbox").locator("visible=true").first
-        r.check(box.input_value() == "10", f"ring height has a box to type in ({box.input_value()!r})")
-        box.fill("14")
-        box.press("Enter")
+        r.check(page.get_by_text("Ring top: height on the object").first.is_visible(), "ring style by default")
+        r.check(page.get_by_text("Diagram: what these settings change").first.is_visible()
+                and page.get_by_text("Ring: front view").first.is_visible(), "diagram of the ring settings shows")
+        # the default ring top is too low for the T: the warning says where to put it
+        warn = page.get_by_text(re.compile(r"set the ring top to [\d.]+ mm")).first.inner_text()
+        top = re.search(r"set the ring top to ([\d.]+) mm", warn).group(1)
+        r.check(True, f"ring too low: the warning suggests {top} mm")
+        r.shot("ring_default")
+        boxes = page.get_by_role("textbox").locator("visible=true")
+        ring_top, ring_height = boxes.nth(0), boxes.nth(1)
+        r.check(ring_top.input_value() == "40" and ring_height.input_value() == "10",
+                f"ring top and height have boxes to type in ({ring_top.input_value()}, {ring_height.input_value()})")
+        # a click on the front view sets the ring top
+        fb = r.visible_canvas()
+        page.mouse.click(fb["x"] + fb["width"] / 2, fb["y"] + fb["height"] * 0.3)
+        for _ in range(240):
+            if ring_top.input_value() != "40":
+                break
+            page.wait_for_timeout(250)
+        r.check(ring_top.input_value() != "40", f"clicking the front view set the ring top ({ring_top.input_value()})")
         r.wait_text("Settings changed", timeout=30_000)
+        # type the suggested ring top and a taller ring, then update
+        ring_top.fill(top)
+        ring_top.press("Enter")
+        ring_height.fill("14")
+        ring_height.press("Enter")
+        page.wait_for_timeout(500)
         r.click("Update holder")
         page.wait_for_function("t => !document.body.innerText.includes(t)", arg="Settings changed", timeout=120_000)
         r.wait_text("No problems found.", timeout=120_000)
-        r.check(True, "typed ring height applied with Update holder")
+        r.check(True, f"typed ring top {top} mm and ring height 14 mm: the T is held without warnings")
+        r.shot("ring_set")
         page.wait_for_timeout(1500)
         fv = page.evaluate("""() => {
           const all = Bokeh.documents.flatMap(d => [...d.all_models]);
