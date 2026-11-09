@@ -52,3 +52,22 @@ def test_find_paper_corners(sample):
     assert found is not None
     err = np.linalg.norm(found - np.asarray(truth["corners_px"], float), axis=1)
     assert err.max() < 8, err
+
+
+def test_find_paper_in_a_real_photo():
+    """A real photo: the table is grey-brown, a shadow covers part of the paper (so in places
+    the paper is darker than lit table, and warm-tinted). Compare with hand-placed corners."""
+    import json
+    from pathlib import Path
+
+    from pegtrace.calibration import find_rectangle_corners
+    from pegtrace.params import PAPER_SIZES
+
+    data = Path(__file__).parent / "data"
+    truth = json.loads((data / "wire_strippers.json").read_text())
+    w, h = PAPER_SIZES[truth["paper"]]
+    for aspect in (None, h / w):
+        found = find_rectangle_corners(Image.open(data / "wire_strippers.jpg"), aspect=aspect)
+        assert found is not None
+        err = np.linalg.norm(found - np.asarray(truth["corners_px"]), axis=1)
+        assert err.max() < 6, err  # px, in a 710 x 823 photo

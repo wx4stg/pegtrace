@@ -94,7 +94,8 @@ class AppState(param.Parameterized):
         if self.photo is None:
             return
         w, h = self.photo.size
-        quad = find_rectangle_corners(self.photo)
+        pw, ph = self.reference_size()
+        quad = find_rectangle_corners(self.photo, aspect=max(pw, ph) / min(pw, ph))
         if quad is None:
             quad = np.array([[0.3 * w, 0.3 * h], [0.7 * w, 0.3 * h], [0.7 * w, 0.7 * h], [0.3 * w, 0.7 * h]])
             self.message = "Could not find the paper automatically; drag the 4 points onto its corners."
