@@ -375,11 +375,17 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
         size = Path(path).stat().st_size
         r.check(size > 10_000, f"downloaded STL ({size / 1024:.0f} KB)")
 
+        name_box = page.locator(".bk-input-group").filter(has_text="Project file name").locator("input")
+        name_box.fill("my_tool")
+        name_box.press("Enter")
+        page.wait_for_timeout(800)
         with page.expect_download(timeout=60_000) as dl:
             r.click("Save project", exact=False)
             page.wait_for_timeout(1500)
             if not dl.is_done():
                 r.click("Save project", exact=False)
+        r.check(dl.value.suggested_filename == "my_tool.json",
+                f"project saved under the typed name ({dl.value.suggested_filename})")
         proj = Path(dl.value.path())
         r.check(proj.stat().st_size > 10_000 and proj.read_text().startswith('{"app": "pegtrace"'),
                 f"saved project ({proj.stat().st_size / 1024:.0f} KB)")

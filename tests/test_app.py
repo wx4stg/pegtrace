@@ -38,6 +38,19 @@ def test_full_ui_flow(app):
     assert len(export._project().getvalue()) > 1000
 
 
+def test_export_file_names(app):
+    export = app.steps[-1]
+    assert export.save.filename == "pegtrace_project.json"
+    app.state.export.project_filename = "wire strippers"
+    assert export.save.filename == "wire strippers.json"
+    app.state.export.project_filename = "  "
+    assert export.save.filename == "pegtrace_project.json"
+    app.state.export.filename = "strippers.STL"
+    assert export.stl.filename == "strippers.STL"
+    app.state.export.filename = "strippers"
+    assert export.stl.filename == "strippers.stl"
+
+
 def test_lasso_and_edit(app):
     state, steps = app.state, app.steps
     steps[0]._on_sample(None)

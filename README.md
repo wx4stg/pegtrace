@@ -47,6 +47,7 @@ locally with `panel serve`, or as a **fully static web page** with Python runnin
    - *Suggest pocket depth* finds the smallest pocket that holds the object securely.
 6. **Export**: download the STL, standing upright ready to print (turn it in your slicer if you like). You
    can also save or load a project file that holds the photo, reference points, outline and all settings.
+   Type a name for each file before downloading it.
 
 ## How the holder is designed
 

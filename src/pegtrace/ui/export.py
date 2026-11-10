@@ -16,18 +16,31 @@ class ExportStep:
     def __init__(self, state: AppState, on_done=None):
         self.state = state
         self.alert = status_alert()
-        self.filename = pn.widgets.TextInput.from_param(state.export.param.filename, name="File name")
-        self.stl = pn.widgets.FileDownload(callback=self._stl, filename=state.export.filename,
+        ex = state.export
+        self.filename = pn.widgets.TextInput.from_param(ex.param.filename, name="File name")
+        self.stl = pn.widgets.FileDownload(callback=self._stl, filename=self._stl_name(),
                                            label="Download STL", button_type="primary", embed=False)
-        state.export.param.watch(lambda e: setattr(self.stl, "filename", self._stl_name()), "filename")
-        self.save = pn.widgets.FileDownload(callback=self._project, filename="pegtrace_project.json",
+        self.project_name = pn.widgets.TextInput.from_param(ex.param.project_filename, name="Project file name")
+        self.save = pn.widgets.FileDownload(callback=self._project, filename=self._project_name(),
                                             label="Save project", button_type="default", embed=False)
+        ex.param.watch(self._sync_names, ["filename", "project_filename"])
         self.load = pn.widgets.FileInput(accept=".json")
         self.load.param.watch(self._on_load, "value")
 
+    @staticmethod
+    def _named(name: str, default: str, ext: str) -> str:
+        name = name.strip() or default
+        return name if name.lower().endswith(ext) else name + ext
+
     def _stl_name(self):
-        name = self.state.export.filename.strip() or "pegtrace_holder.stl"
-        return name if name.lower().endswith(".stl") else name + ".stl"
+        return self._named(self.state.export.filename, "pegtrace_holder.stl", ".stl")
+
+    def _project_name(self):
+        return self._named(self.state.export.project_filename, "pegtrace_project.json", ".json")
+
+    def _sync_names(self, _=None):
+        self.stl.filename = self._stl_name()
+        self.save.filename = self._project_name()
 
     def _stl(self):
         try:
@@ -46,6 +59,8 @@ class ExportStep:
             return
         try:
             self.state.from_json(event.new.decode("utf-8"))
+            if self.load.filename:  # saving again keeps the loaded file's name
+                self.state.export.project_filename = self.load.filename
             show(self.alert, "Project loaded.", "success")
         except Exception as e:
             show(self.alert, f"Could not load that project: {e}", "danger")
@@ -74,6 +89,7 @@ class ExportStep:
             pn.layout.Divider(),
             "### Project",
             help_text("Save the photo, reference points, outline and all settings to a file, or load one."),
+            self.project_name,
             pn.Row(self.save, self.load),
             self.alert,
             width=520,
