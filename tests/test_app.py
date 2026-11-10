@@ -133,3 +133,27 @@ def test_photo_upload_messages(app):
     # a HEIC photo the browser could not convert
     load.file.value = b"\0\0\0\x18ftypheic\0\0\0\0mif1heic" + b"\0" * 64
     assert "Could not convert that HEIC photo" in load.alert.object
+
+
+def test_load_project_without_photo(app):
+    state, steps = app.state, app.steps
+    load_sample(steps[0])
+    steps[1]._on_apply(None)
+    steps[2]._on_auto(None)
+    state.auto_direction()
+    export = steps[-1]
+    export.include_photo.value = False
+    text = export._project().getvalue()
+    assert '"photo_jpeg_b64": null' in text
+    load_sample(steps[0])  # a different photo on screen
+    export.load.value = text.encode()
+    assert "without a photo" in export.alert.object
+    assert state.photo is None and state.outline is not None and state.result is not None
+    for s in steps:  # every view renders without the photo
+        pn.panel(s.view()).get_root()
+    # the Trace view is a blank area around the outline
+    from pegtrace.ui.trace import cal_rgb
+
+    bx0, by0, bx1, by1 = cal_rgb(None, state.raw_outline).bounds.lbrt()
+    x0, y0, x1, y1 = state.raw_outline.bounds
+    assert bx0 < x0 and by0 < y0 and bx1 > x1 and by1 > y1

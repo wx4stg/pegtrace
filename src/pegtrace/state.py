@@ -73,7 +73,7 @@ class AppState(param.Parameterized):
             obj.param.watch(self._params_changed, [p for p in obj.param if p != "name"])
 
     # ------------------------------------------------------------ photo
-    def set_photo(self, img: Image.Image, name: str = "") -> None:
+    def set_photo(self, img: Image.Image | None, name: str = "") -> None:
         with param.parameterized.batch_call_watchers(self):
             self.calibration = None
             self.raw_outline = None
@@ -232,9 +232,13 @@ class AppState(param.Parameterized):
         return solid_stl(self.result.solid)  # standing upright, ready to print
 
     # ------------------------------------------------------------ project files
-    def to_json(self) -> str:
+    def to_json(self, include_photo: bool | None = None) -> str:
+        """The project as JSON. Without the photo the file is a few KB instead of a few hundred;
+        it still holds the outline (in mm), the scale reference and all settings."""
+        if include_photo is None:
+            include_photo = self.export.include_photo
         photo_b64 = None
-        if self.photo is not None:
+        if self.photo is not None and include_photo:
             buf = io.BytesIO()
             img = self.photo
             if max(img.size) > 3000:
@@ -283,15 +287,18 @@ class AppState(param.Parameterized):
                 obj.param.update(preset="Custom")
             known = {k: v for k, v in vals.items() if k in obj.param}
             obj.param.update(**obj.param.deserialize_parameters(json.dumps(known)))
-        if doc.get("photo_jpeg_b64"):
+        has_photo = bool(doc.get("photo_jpeg_b64"))
+        if has_photo:
             self.set_photo(load_image(base64.b64decode(doc["photo_jpeg_b64"])), doc.get("photo_name", ""))
+        else:  # a photo already on screen belongs to another project
+            self.set_photo(None, doc.get("photo_name", ""))
         self.param.update(
             cal_method=doc.get("cal_method", RECT),
             paper=doc.get("paper", self.paper),
             custom_w=doc.get("custom_size", [100, 100])[0],
             custom_h=doc.get("custom_size", [100, 100])[1],
-            corners_px=[tuple(p) for p in doc.get("corners_px", [])],
-            ruler_px=[tuple(p) for p in doc.get("ruler_px", [])],
+            corners_px=[tuple(p) for p in doc.get("corners_px", [])] if has_photo else [],
+            ruler_px=[tuple(p) for p in doc.get("ruler_px", [])] if has_photo else [],
             ruler_mm=doc.get("ruler_mm", 100.0),
             px_per_mm=doc.get("px_per_mm", 4.0),
         )
@@ -301,4 +308,6 @@ class AppState(param.Parameterized):
                           direction=doc.get("direction", 270.0))
         if doc.get("outline_mm"):
             self.set_outline(Polygon(doc["outline_mm"]))
+        if not has_photo:
+            self.param.trigger("calibration")  # redraw the Trace view around the outline
         self.rebuild()

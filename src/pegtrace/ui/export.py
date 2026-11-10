@@ -21,6 +21,7 @@ class ExportStep:
         self.stl = pn.widgets.FileDownload(callback=self._stl, filename=self._stl_name(),
                                            label="Download STL", button_type="primary", embed=False)
         self.project_name = pn.widgets.TextInput.from_param(ex.param.project_filename, name="Project file name")
+        self.include_photo = pn.widgets.Checkbox.from_param(ex.param.include_photo, name="Include the photo")
         self.save = pn.widgets.FileDownload(callback=self._project, filename=self._project_name(),
                                             label="Save project", button_type="default", embed=False)
         ex.param.watch(self._sync_names, ["filename", "project_filename"])
@@ -61,7 +62,11 @@ class ExportStep:
             self.state.from_json(event.new.decode("utf-8"))
             if self.load.filename:  # saving again keeps the loaded file's name
                 self.state.export.project_filename = self.load.filename
-            show(self.alert, "Project loaded.", "success")
+            if self.state.photo is None:
+                show(self.alert, "Project loaded, without a photo: the outline and all settings are back, so "
+                     "you can go on from the Orientation step.", "success")
+            else:
+                show(self.alert, "Project loaded.", "success")
         except Exception as e:
             show(self.alert, f"Could not load that project: {e}", "danger")
 
@@ -88,8 +93,9 @@ class ExportStep:
             self.filename, self.stl,
             pn.layout.Divider(),
             "### Project",
-            help_text("Save the photo, reference points, outline and all settings to a file, or load one."),
-            self.project_name,
+            help_text("Save the photo, reference points, outline and all settings to a file, or load one. "
+                      "Leave out the photo for a much smaller file that still makes the same holder."),
+            self.project_name, self.include_photo,
             pn.Row(self.save, self.load),
             self.alert,
             width=520,

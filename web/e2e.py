@@ -425,6 +425,24 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
         page.locator("input[type=file][accept='.json']").set_input_files(str(proj))
         r.wait_text("Project loaded.", timeout=120_000)
         r.check(True, "project file loaded back")
+
+        box = page.get_by_text("Include the photo", exact=True).locator("xpath=preceding-sibling::input")
+        r.check(box.is_checked(), "the photo is included by default")
+        box.uncheck()
+        page.wait_for_timeout(800)
+        r.check(not box.is_checked(), "unticked Include the photo")
+        with page.expect_download(timeout=60_000) as dl:
+            r.click("Save project", exact=False)
+            page.wait_for_timeout(1500)
+            if not dl.is_done():
+                r.click("Save project", exact=False)
+        small = Path(dl.value.path())
+        text = small.read_text()
+        r.check(small.stat().st_size < 20_000 and '"photo_jpeg_b64": null' in text and '"outline_mm": [[' in text,
+                f"saved project without the photo ({small.stat().st_size / 1024:.1f} KB)")
+        page.locator("input[type=file][accept='.json']").set_input_files(str(small))
+        r.wait_text("Project loaded, without a photo", timeout=120_000)
+        r.check(page.get_by_text(re.compile(r"Holder:.*mode")).count() > 0, "photo-less project loaded back with its holder")
         r.shot("export")
 
         r.step = "theme"

@@ -61,6 +61,24 @@ def test_project_roundtrip(ready_state):
     assert s2.result.solid.volume() == pytest.approx(s.result.solid.volume(), rel=1e-3)
 
 
+
+def test_project_without_photo(ready_state):
+    s, _ = ready_state
+    s.flat.ring_top = 77
+    s.rebuild()
+    full, small = s.to_json(), s.to_json(include_photo=False)
+    assert len(small) < len(full) / 20
+    s.export.include_photo = False  # the Export step's checkbox
+    assert '"photo_jpeg_b64": null' in s.to_json()
+    s2 = AppState()
+    s2.from_json(full)  # a photo on screen from another project
+    s2.from_json(small)
+    assert s2.photo is None and s2.calibration is None and s2.corners_px == []
+    assert s2.flat.ring_top == 77 and s2.direction == s.direction
+    assert s2.outline.symmetric_difference(s.outline).area < 1.0
+    assert s2.result.solid.volume() == pytest.approx(s.result.solid.volume(), rel=1e-3)
+
+
 def test_ruler_calibration():
     photo, _ = make_photo()
     s = AppState()

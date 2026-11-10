@@ -123,6 +123,7 @@ class ShelfParams(param.Parameterized):
 class ExportParams(param.Parameterized):
     filename = param.String("pegtrace_holder.stl")
     project_filename = param.String("pegtrace_project.json")
+    include_photo = param.Boolean(True, doc="Save the photo in the project file")
 
 
 # Human-readable widget labels (pn.Param uses Parameter.label)

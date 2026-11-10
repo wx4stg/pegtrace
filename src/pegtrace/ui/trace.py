@@ -13,11 +13,17 @@ from ..tracing import outline_stats
 from .common import FILL_WINDOW, display_array, help_text, run_busy, show, status_alert
 
 
-def cal_rgb(data) -> hv.RGB:
-    """Calibrated image in mm (``data`` is a Calibration, as sent through a Pipe)."""
+def cal_rgb(data, outline=None) -> hv.RGB:
+    """Calibrated image in mm (``data`` is a Calibration, as sent through a Pipe). Without
+    one (a project saved without its photo) a blank area around ``outline``, if given."""
     cal = data
     if cal is None:
-        return hv.RGB(np.full((2, 2, 3), 240, np.uint8), bounds=(0, 0, 1, 1))
+        bounds = (0, 0, 1, 1)
+        if outline is not None:
+            x0, y0, x1, y1 = outline.bounds
+            m = 0.1 * max(x1 - x0, y1 - y0) + 10
+            bounds = (x0 - m, y0 - m, x1 + m, y1 + m)
+        return hv.RGB(np.full((2, 2, 3), 240, np.uint8), bounds=bounds)
     return hv.RGB(display_array(cal.image, 1400), bounds=cal.bounds)
 
 
@@ -134,7 +140,7 @@ class TraceStep:
         # existing responsive plot, so streamed images would be cropped.
         @pn.depends(self.state.param.calibration)
         def plot(cal):
-            rgb = cal_rgb(cal).opts(tools=["poly_select"], default_tools=["pan", "wheel_zoom", "reset"])
+            rgb = cal_rgb(cal, self.state.raw_outline).opts(tools=["poly_select"], default_tools=["pan", "wheel_zoom", "reset"])
             self.lasso = hv.streams.Lasso(source=rgb)
             self.lasso.add_subscriber(self._on_lasso)
             return (rgb * self.polys).opts(
