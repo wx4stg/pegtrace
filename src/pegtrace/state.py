@@ -62,7 +62,6 @@ class AppState(param.Parameterized):
     stale = param.Boolean(default=False, doc="Design settings changed since the holder was built")
     error = param.String(default="")
     message = param.String(default="")
-    theme = param.Selector(default="default", objects=["default", "dark"], doc="UI theme (not saved)")
 
     def __init__(self, **params):
         params.setdefault("pegboard", PegboardParams())

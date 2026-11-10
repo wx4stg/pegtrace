@@ -2,7 +2,7 @@
 
 The sketches are schematic, not to scale. Labels use the settings' names on the page, so a
 reader can match a slider to the dimension it controls. Text and lines use ``currentColor``
-so the sketches follow the light and dark themes.
+so the sketches follow the page's text colour.
 """
 
 from __future__ import annotations

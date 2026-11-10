@@ -158,7 +158,7 @@ class DesignStep:
             self.scene_box.objects = []
             return
         archive = scene_archive(r, self.state.pegboard, show_board=self.show_board.value,
-                                show_object=self.show_object.value, dark=self.state.theme == "dark")
+                                show_object=self.show_object.value)
         self.scene = scene_pane(archive, sizing_mode="stretch_both", min_height=560, orientation_widget=True,
                                 enable_keybindings=True)
         self.scene_box.objects = [self.scene]

@@ -17,7 +17,7 @@ OUTLINE_OPTS = dict(color="#e15759", line_width=2, line_dash="dashed")
 # Rows holding a big plot fill the window below the header and step tabs (min heights still apply).
 FILL_WINDOW = {"height": "calc(100vh - 100px)"}
 
-# Bokeh's tab headers hard-code dark text on the active tab; follow the Panel theme instead.
+# Style Bokeh's tab headers with Panel's colours.
 TABS_CSS = """
 .bk-header .bk-tab { color: var(--panel-on-background-color); }
 .bk-header .bk-tab.bk-active { color: var(--panel-on-background-color); background-color: var(--panel-background-color);

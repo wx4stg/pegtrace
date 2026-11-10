@@ -164,7 +164,7 @@ def board_solid(result: HolderResult, pb: PegboardParams) -> Solid:
 
 
 def scene_archive(result: HolderResult, pb: PegboardParams | None = None, show_board: bool = True,
-                  show_object: bool = True, dark: bool = False) -> bytes:
+                  show_object: bool = True) -> bytes:
     actors = []
     for k, s in _ordered(result.parts):
         v, t = s.to_mesh()
@@ -177,5 +177,4 @@ def scene_archive(result: HolderResult, pb: PegboardParams | None = None, show_b
         if not b.is_empty():
             v, t = b.to_mesh()
             actors.append(MeshActor("pegboard", v, t, color=hex_to_rgb(BOARD_COLOR), opacity=0.35))
-    bg = (0.09, 0.1, 0.12) if dark else (1.0, 1.0, 1.0)
-    return scene_bytes(actors, background=bg)
+    return scene_bytes(actors, background=(1.0, 1.0, 1.0))

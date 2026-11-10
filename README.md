@@ -151,7 +151,6 @@ The end-to-end test drives every step with real clicks:
 - loads the sample photo and calibrates;
 - draws a polygon by hand, clears it, then auto-detects the outline;
 - picks an orientation and checks the views, including Shelf mode and the ring style;
-- switches to the dark theme;
 - downloads the STL;
 - saves the project and loads it back;
 - fails on any browser console error.

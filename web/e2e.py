@@ -388,19 +388,10 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
         r.check(True, "project file loaded back")
         r.shot("export")
 
-        print("theme toggle")
-
-        r.step = "theme toggle"
+        r.step = "theme"
         bg = page.evaluate("getComputedStyle(document.body).backgroundColor")
-        r.check(bg == "rgb(255, 255, 255)", f"light theme by default (body {bg})")
-        r.click("☾ Dark mode")
-        page.wait_for_url("**theme=dark**", timeout=30_000)
-        r.wait_text("Try the sample photo", timeout=boot_timeout * 1000)
-        page.wait_for_timeout(1500)
-        bg = page.evaluate("getComputedStyle(document.body).backgroundColor")
-        r.check(bg == "rgb(33, 37, 41)", f"dark theme after the toggle (body {bg})")
-        r.check(page.get_by_role("button", name="☀ Light mode").count() == 1, "toggle offers light mode")
-        r.shot("dark_theme")
+        r.check(bg == "rgb(255, 255, 255)", f"light page (body {bg})")
+        r.check(page.get_by_role("button", name="Dark mode", exact=False).count() == 0, "no dark mode toggle")
 
         bad = [e for e in r.errors if "favicon" not in e]
         r.check(not bad, "no browser console errors" + ("" if not bad else f": {bad[:5]}"))
