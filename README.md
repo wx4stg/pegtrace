@@ -60,8 +60,11 @@ rotated so that gravity points to −y.
 - `Pc = P` grown by the clearance. `U = sweep_up(Pc)` is the Minkowski sum of Pc with a vertical segment:
   every point the object passes through while it is lifted straight out. **No material is placed inside U**,
   so the object can always be removed upwards, and the cavity has no overhangs when printed upright.
-- Walls are the clearance outline grown by the wall thickness, clipped at the pocket top, minus U. They extrude
-  over the object's thickness, in front of a back plate.
+- Walls are U grown by the wall thickness, clipped at the pocket top, minus U. Growing U rather than the
+  outline keeps them the full thickness where a wider part of the object sweeps past a narrower one. Gaps
+  in U narrower than a wall are filled in first, and anything still thinner than the wall thickness is
+  removed, so no wall is ever thinner than the setting. They extrude over the object's thickness, in front
+  of a back plate.
 - An optional **front lip** in front of the object stops it tipping forward. It leaves a window and never
   blocks the lift-out path.
 - **Flat bottom** sweeps everything down to a common floor, so the part prints standing up with no supports.
@@ -79,7 +82,9 @@ isn't needed.
 - A band of walls, plus the back plate and a closed front bar, circles the narrow part (one loop per part
   when there are several, like the two handles of pliers). The wide part rests on the band, and everything
   below hangs free through it. The loops only clear the object where it sits in them: parts below that
-  flare out are threaded through by tilting the object, rather than cutting the loops open.
+  flare out are threaded through by tilting the object, rather than cutting the loops open. The loops and
+  the supports under them are at least the wall thickness everywhere; where a leaning part cuts into a
+  support, the support reaches out to a full wall's thickness from it.
 - The band's underside slopes back to the board at about 50° from horizontal, so it still prints upright
   without supports. The back plate's bottom follows the same slope, so the whole underside is one flat
   face: lay it on the bed to print the holder at an angle. *Back plate below the ring supports* lowers the

@@ -46,6 +46,44 @@ class FlatRegions:
     ring_bottom: float | None = None  # ring style: bottom of the band
     ring_rest: float | None = None  # ring style: where the object's wide part meets the ring (None: nowhere)
     plate_below: float = 0.0  # ring style: how far the back plate reaches below the sloped supports
+    cleared: object = None  # the keep-out with gaps narrower than a wall closed up (walls stay out of it)
+    wall: float = 0.0
+
+
+def wall_around(keepout, wall: float):
+    """The space walls must clear, and everything within ``wall`` of it.
+
+    Walls are ``outer - cleared``, so they are at least ``wall`` thick everywhere:
+    - they follow the keep-out (the space the object moves through), not the outline, which a
+      wider part of the object would shave thinner as it sweeps past;
+    - the keep-out is first closed by ``wall``: gaps and notches narrower than that become
+      part of the cleared space instead of thin slivers or bridges of wall.
+    """
+    r = wall / 2
+    filled = clean(keepout.buffer(r, quad_segs=12).buffer(-r, quad_segs=12).difference(keepout))
+    # only real gaps: closing also shifts straight edges by a rounding error, a hairline that
+    # would grow a wall where none belongs (under the bar of a T sitting on the ring, say)
+    filled = clean(filled.buffer(-0.05).buffer(0.05))
+    cleared = clean(keepout.union(filled)) if not filled.is_empty else keepout
+    return cleared, cleared.buffer(wall, quad_segs=12)
+
+
+THIN_TOL = 0.05  # mm: how much thinner than the setting a wall may be before it counts as thin
+
+
+def without_thin_parts(walls, wall: float):
+    """Remove what is still thinner than ``wall``: tapering horns where a curve of the
+    keep-out meets the edge of the band or pocket, or a thin tip cut by the thumb notch.
+    Thin parts are what an opening by ``wall / 2`` removes, except the small bits it shaves off
+    every sharp corner (those stay, so corners stay square and print without overhangs)."""
+    r = wall / 2 - THIN_TOL  # offsets drawn with chords fall a hair short of ``wall`` at curves
+    opened = walls.buffer(-r, quad_segs=12).buffer(r, quad_segs=12)
+    corner = 2 * (wall / 2) ** 2 * (1 - np.pi / 4)  # an acute corner sheds up to about this much
+    thin = [p for p in polygons_of(walls.difference(opened)) if p.area > corner]
+    if not thin:
+        return walls
+    # a hair's margin, and no specks left over: they would be loose bits in the print
+    return clean(walls.difference(union(thin).buffer(1e-4)), min_area=corner)
 
 
 def pocket_top(pc: Polygon, fp: FlatParams) -> float:
@@ -135,13 +173,16 @@ def _ring_regions(outline: Polygon, pc: Polygon, u, fp: FlatParams, pb: Pegboard
     top = min(max(y0 + fp.ring_top, y0 + 0.5), y1)
     bottom = top - fp.ring_height
     band = rect(pc.bounds[0] - BIG, bottom, pc.bounds[2] + BIG, top)
-    ring = clean(below(pc, top).buffer(fp.wall, quad_segs=12).intersection(band))
     # The walls only clear the object's cross-section where it sits in the ring. Parts below
     # it are threaded through by tilting the object (handles that flare apart, say), so
     # unlike a pocket they don't cut the ring open; the object itself (pc) stays clear.
     inside = above(below(pc, top), bottom - 1.0)
     u = union([sweep_up(inside), pc])
-    walls = clean(ring.difference(u))
+    cleared, _ = wall_around(u, fp.wall)
+    # only the cleared space inside the band makes walls (a part of the object just above it
+    # would leave a sliver under itself, cut off by the top of the band)
+    ring = clean(clean(cleared.intersection(band)).buffer(fp.wall, quad_segs=12).intersection(band))
+    walls = without_thin_parts(clean(ring.difference(cleared)), fp.wall)
     zmax = fp.back_t + fp.object_thickness + fp.clear_z + fp.lip_t
     y_floor = bottom - CHAMFER_SLOPE * zmax  # lowest point of the chamfer under the ring
 
@@ -156,7 +197,8 @@ def _ring_regions(outline: Polygon, pc: Polygon, u, fp: FlatParams, pb: Pegboard
     back = union([ring, tab])
     return FlatRegions(outline=outline, grown=pc, keepout=u, pocket_top=top, lip_top=top, y_floor=y_floor,
                        back=back, walls=walls, lip=ring, pegs=layout, style="ring", ring_bottom=bottom,
-                       ring_rest=ring_rest(pc, top, fp), plate_below=fp.plate_below)
+                       ring_rest=ring_rest(pc, top, fp), plate_below=fp.plate_below, cleared=cleared,
+                       wall=fp.wall)
 
 
 def flat_regions(outline: Polygon, fp: FlatParams, pb: PegboardParams) -> FlatRegions:
@@ -167,10 +209,10 @@ def flat_regions(outline: Polygon, fp: FlatParams, pb: PegboardParams) -> FlatRe
         return _ring_regions(outline, pc, u, fp, pb)
     h = pocket_top(pc, fp)
     pl = below(pc, h)
-    wout = pl.buffer(fp.wall, quad_segs=12)
-    cradle = below(wout, h)
+    cleared, wout = wall_around(u, fp.wall)
+    cradle = clean(below(wout, h))
     y_floor = cradle.bounds[1]
-    walls = clean(cradle.difference(u))
+    walls = clean(cradle.difference(cleared))
 
     lip = Polygon()
     y0 = pc.bounds[1]
@@ -192,7 +234,7 @@ def flat_regions(outline: Polygon, fp: FlatParams, pb: PegboardParams) -> FlatRe
 
     if fp.flat_bottom:
         back = above(sweep_down(back), y_floor)
-        walls = clean(above(sweep_down(walls), y_floor).difference(u))
+        walls = clean(above(sweep_down(walls), y_floor).difference(cleared))
         if not lip.is_empty:
             lip = above(sweep_down(lip), y_floor)
 
@@ -202,6 +244,7 @@ def flat_regions(outline: Polygon, fp: FlatParams, pb: PegboardParams) -> FlatRe
         walls = clean(walls.difference(notch))
         if not lip.is_empty:
             lip = clean(lip.difference(Point(cx, lip_top).buffer(fp.notch_d / 2, quad_segs=16)))
+    walls = without_thin_parts(walls, fp.wall)
 
     return FlatRegions(outline=outline, grown=pc, keepout=u, pocket_top=h, lip_top=lip_top,
                        y_floor=y_floor, back=back, walls=walls, lip=lip, pegs=layout)
@@ -301,9 +344,16 @@ def _with_ring_chamfer(parts: dict, reg: FlatRegions, bt: float, depth: float, l
         return clean(above(sweep_down(g), yf - 1))
 
     ring = reg.lip
+    # Under the walls, minus the space the object hangs in. Where a leaning part of the object
+    # cuts into that, the support also reaches out to a full wall's thickness from it (still
+    # under the ring), so it doesn't taper to a sliver.
+    hanging = clean(below(reg.cleared, bottom))  # the object below the ring
+    near = clean(hanging.buffer(reg.wall, quad_segs=12).intersection(below(down(ring), bottom)))
+    support_walls = clean(union([down(reg.walls), near]).difference(reg.cleared))
+    support_walls = without_thin_parts(support_walls, reg.wall)
     support = {
         "back plate": extrude_z(down(ring), 0.0, bt),
-        "walls": extrude_z(clean(down(reg.walls).difference(reg.keepout)), bt, bt + depth),
+        "walls": extrude_z(support_walls, bt, bt + depth),
         "lip": extrude_z(down(ring), bt + depth, zmax),
     }
     out = dict(parts)

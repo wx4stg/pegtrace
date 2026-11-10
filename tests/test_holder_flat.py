@@ -203,3 +203,38 @@ def test_ring_closes_around_separate_handles():
     # and the holder never overlaps the object where it hangs
     ghost = r.ghost
     assert (r.solid & ghost).volume() == pytest.approx(0, abs=1e-3)
+
+
+def _thin_area(region, t):
+    """Area of ``region`` thinner than ``t``: what an opening by t/2 removes, ignoring the bits
+    it shaves off sharp corners (up to about (t/2)^2 (1 - pi/4) each, a little more if acute)."""
+    from pegtrace.geom2d import polygons_of
+
+    r = t / 2 - 0.05  # within 0.1 mm: curves are drawn with chords
+    opened = region.buffer(-r, quad_segs=16).buffer(r, quad_segs=16)
+    corner = 2 * (t / 2) ** 2 * (1 - np.pi / 4)
+    return sum(p.area for p in polygons_of(region.difference(opened)) if p.area > corner)
+
+
+@pytest.fixture
+def pliers():
+    """A joint on top of two legs that flare apart going down (like wire cutters' handles)."""
+    from shapely.geometry import Polygon, box
+
+    left = Polygon([(-16, 100), (-4, 100), (-22, 0), (-36, 0)])
+    right = Polygon([(4, 100), (16, 100), (36, 0), (22, 0)])
+    return box(-20, 100, 20, 125).union(left).union(right)
+
+
+@pytest.mark.parametrize("wall", [1.2, 2.4, 4.0, 6.0])
+@pytest.mark.parametrize("style", ["ring", "pocket"])
+def test_walls_are_never_thinner_than_the_setting(pliers, style, wall):
+    from pegtrace.holder_flat import flat_regions
+
+    fp = FlatParams(style=style, ring_top=99, wall=wall, pocket_percent=60)
+    reg = flat_regions(pliers, fp, PegboardParams())
+    assert reg.walls.area > 0
+    assert _thin_area(reg.walls, wall) < 0.01
+    r = build_flat(pliers, fp, PegboardParams())
+    assert r.solid.is_valid() and r.solid.num_components() == 1
+    assert (r.solid & r.keepout).volume() == pytest.approx(0, abs=1e-3)
