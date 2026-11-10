@@ -44,8 +44,8 @@ locally with `panel serve`, or as a **fully static web page** with Python runnin
      Exporting, or *Continue to export*, rebuilds first if settings changed.
    - Warnings flag a shallow pocket, a single hook, an object that can tip out, and similar problems.
    - *Suggest pocket depth* finds the smallest pocket that holds the object securely.
-6. **Export**: download the STL, either upright for printing or in mounted orientation. You can also save or
-   load a project file that holds the photo, reference points, outline and all settings.
+6. **Export**: download the STL, standing upright ready to print (turn it in your slicer if you like). You
+   can also save or load a project file that holds the photo, reference points, outline and all settings.
 
 ## How the holder is designed
 

@@ -230,7 +230,7 @@ class AppState(param.Parameterized):
             self.rebuild()
         if self.result is None:
             raise ValueError("Nothing to export yet.")
-        return solid_stl(self.result.solid, self.export.orientation)
+        return solid_stl(self.result.solid)  # standing upright, ready to print
 
     # ------------------------------------------------------------ project files
     def to_json(self) -> str:

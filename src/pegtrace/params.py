@@ -121,11 +121,6 @@ class ShelfParams(param.Parameterized):
 
 
 class ExportParams(param.Parameterized):
-    orientation = param.Selector(
-        default="print (upright)",
-        objects=["print (upright)", "as mounted"],
-        doc="Print: bottom on the bed, needs no supports. As mounted: board plane is XY.",
-    )
     filename = param.String("pegtrace_holder.stl")
 
 
@@ -155,7 +150,7 @@ _LABELS = {
         "rim_t": "Rim thickness (mm)", "gussets": "Support gussets", "gusset_t": "Gusset thickness (mm)",
         "object_height": "Object height (preview, mm)",
     },
-    ExportParams: {"orientation": "STL orientation", "filename": "File name"},
+    ExportParams: {"filename": "File name"},
 }
 for _cls, _labels in _LABELS.items():
     for _name, _label in _labels.items():
