@@ -13,7 +13,8 @@ locally with `panel serve`, or as a **fully static web page** with Python runnin
 
 ## Workflow
 
-1. **Photo**: upload a photo.
+1. **Photo**: upload a photo (JPEG, PNG, HEIC and others). HEIC photos, as iPhones take them, are converted
+   to JPEG in the browser; the converter loads from the internet the first time.
    - Lay the object flat on a sheet of paper (or next to a ruler) and shoot from roughly above.
    - All four paper corners must be visible.
 2. **Scale**: two choices.

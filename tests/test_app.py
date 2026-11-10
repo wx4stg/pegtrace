@@ -130,3 +130,6 @@ def test_photo_upload_messages(app):
     assert "Loaded the photo (1600 × 1200 px)" in load.alert.object
     load.file.filename = "later.jpg"
     assert app.state.photo_name == "later.jpg" and "Loaded **later.jpg**" in load.alert.object
+    # a HEIC photo the browser could not convert
+    load.file.value = b"\0\0\0\x18ftypheic\0\0\0\0mif1heic" + b"\0" * 64
+    assert "Could not convert that HEIC photo" in load.alert.object

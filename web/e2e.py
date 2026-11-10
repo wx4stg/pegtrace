@@ -25,18 +25,24 @@ from playwright.sync_api import Page, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "build" / "e2e-data"
+# A real HEIC photo from libheif's examples (downloaded once; there is no local HEIC encoder).
+HEIC_URL = "https://github.com/strukturag/libheif/raw/master/examples/example.heic"
 
 
-def test_photos() -> Path:
-    """The synthetic sample photo as a JPEG."""
+def test_photos() -> tuple[Path, Path]:
+    """The synthetic sample photo as a JPEG, and a HEIC photo."""
+    import urllib.request
+
     sys.path.insert(0, str(ROOT / "src"))
     from pegtrace.sample import make_photo
 
     DATA.mkdir(parents=True, exist_ok=True)
-    jpg = DATA / "sample_photo.jpg"
+    jpg, heic = DATA / "sample_photo.jpg", DATA / "example.heic"
     if not jpg.exists():
         make_photo()[0].save(jpg, quality=92)
-    return jpg
+    if not heic.exists():
+        urllib.request.urlretrieve(HEIC_URL, heic)
+    return jpg, heic
 
 
 def free_port() -> int:
@@ -187,9 +193,17 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
         print("step 1: photo")
 
         r.step = "step 1: photo"
-        jpg = test_photos()
+        jpg, heic = test_photos()
         r.check(page.get_by_role("button", name="Try the sample photo").count() == 0, "no sample photo button")
-        photo_input = page.locator("input[type=file][accept*='.jpg']")
+        photo_input = page.locator("input[type=file][accept*='.heic']")
+        photo_input.set_input_files(str(heic))
+        # a loaded photo moves on to the Scale step; a failure stays on the Photo step with a message
+        page.get_by_role("button", name="Apply scale").or_(page.get_by_text("Could not convert")).first.wait_for(
+            state="visible", timeout=90_000)
+        r.tab("1 · Photo")
+        msg = page.get_by_text(re.compile(r"Loaded example\.heic|Could not convert")).first.inner_text()
+        r.check(re.search(r"Loaded example\.heic \(\d+ × \d+ px\)", msg) is not None,
+                f"HEIC photo converted and loaded ({msg})")
         photo_input.set_input_files(str(jpg))
         page.get_by_role("button", name="Apply scale").wait_for(state="visible", timeout=60_000)
         r.tab("1 · Photo")
