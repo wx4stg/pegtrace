@@ -123,8 +123,10 @@ class TraceStep:
         controls = pn.Column(
             "### Trace the object",
             help_text("Use the **polygon select** tool: click around the object's outline, then press "
-                      "**Enter** (or press and hold the mouse) to close it. Or press *Auto-detect*. "
-                      "Then drag the red vertices to fine-tune. Include everything that sticks out."),
+                      "**Enter** (or press and hold the mouse) to close it. Or press *Auto-detect*.\n\n"
+                      "Once a polygon is created manually or via auto-detect, use the **poly edit** tool "
+                      "(far right of the image) to edit the vertices (click and hold on the red "
+                      "selection polygon to make the vertices appear)."),
             pn.Row(self.auto, self.clear), self.simplify, self.stats, self.done, self.alert,
             width=340,
         )

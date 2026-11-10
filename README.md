@@ -26,8 +26,9 @@ locally with `panel serve`, or as a **fully static web page** with Python runnin
    - Use the **polygon select** tool: click around the object, then press **Enter** (or press and hold) to
      close the polygon.
    - Or press **Auto-detect**. It merges the points of rounded corners into one point each.
-   - Drag the red vertices to refine the outline. A slider smooths or simplifies it; edited points are kept
-     exactly.
+   - Then use the **poly edit** tool (far right of the image) to refine the outline: click and hold on the
+     red polygon to make its vertices appear, then drag them. A slider smooths or simplifies it; edited
+     points are kept exactly.
 4. **Orientation**: pick the mount style, then set the arrow.
    - **Flat**: the object hangs against the board, held by a ring around a narrow part (the default) or
      (Design step) a pocket-style cradle. The arrow points *down*.
