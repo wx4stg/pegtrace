@@ -88,8 +88,9 @@ class ExportStep:
         return pn.Column(
             "### Export",
             pn.panel(summary),
-            help_text("The STL stands the holder upright on its flat bottom, so it prints without supports "
-                      "(the pegs print horizontally). Turn it in your slicer if you prefer."),
+            help_text("The STL stands the holder upright, as it hangs (the pegs print horizontally). A ring "
+                      "holder's sloped underside is one flat face: lay it on the bed in your slicer to print "
+                      "it at an angle. Turn it however you prefer."),
             self.filename, self.stl,
             pn.layout.Divider(),
             "### Project",

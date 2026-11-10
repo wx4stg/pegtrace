@@ -16,7 +16,8 @@ from .diagrams import SKETCHES
 
 PEG_FIELDS = ["preset", "spacing", "hole_d", "board_t", "peg_clear", "board_clear", "hook_rise", "columns",
               "max_pegs", "stride", "add_pins", "pin_rows", "pin_length", "peg_profile", "tab_margin"]
-RING_FIELDS = ["style", "ring_top", "ring_height", "object_thickness", "clear_xy", "clear_z", "wall", "back_t", "lip_t"]
+RING_FIELDS = ["style", "ring_top", "ring_height", "object_thickness", "clear_xy", "clear_z", "wall", "back_t",
+               "plate_below", "lip_t"]
 FLAT_FIELDS = ["style", "object_thickness", "pocket_mode", "pocket_percent", "pocket_mm", "clear_xy", "clear_z", "wall",
                "back_t", "lip", "lip_overlap", "lip_t", "lip_height_percent", "flat_bottom", "notch", "notch_d"]
 SHELF_FIELDS = ["pocket_depth", "through", "floor_t", "clear_xy", "shelf_wall", "back_t", "rim_height", "rim_t",

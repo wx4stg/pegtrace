@@ -98,6 +98,27 @@ def test_ring_holds_t_by_its_bar(letter_t):
     assert lo[1] > 50
 
 
+def test_ring_underside_is_one_flat_face(letter_t):
+    """With no back plate below the ring supports, nothing but the pegs (behind the board)
+    reaches below the supports' slope, so the holder can lie on it to print at an angle."""
+    from pegtrace.holder_flat import CHAMFER_SLOPE, flat_regions
+
+    pb = PegboardParams()
+    for below in (0.0, 5.0):
+        fp = FlatParams(style="ring", ring_top=99, plate_below=below)
+        r = build_flat(letter_t, fp, pb)
+        assert r.solid.is_valid() and r.solid.num_components() == 1 and not r.warnings
+        yf = flat_regions(letter_t, fp, pb).y_floor
+        v, _ = Solid.union_all([s for k, s in r.parts.items() if k != "pegs"]).to_mesh()
+        under = (yf + CHAMFER_SLOPE * v[:, 2]) - v[:, 1]  # how far each vertex lies below the slope
+        assert under.max() == pytest.approx(below, abs=1e-3)
+        # every vertex of the plate's bottom lies on the (lowered) slope
+        plate, _ = r.parts["back plate"].to_mesh()
+        low = plate[:, 1] <= yf - below + CHAMFER_SLOPE * fp.back_t + 1e-3
+        assert low.sum() >= 4
+        assert np.allclose(plate[low, 1], yf - below + CHAMFER_SLOPE * plate[low, 2], atol=1e-3)
+
+
 def test_ring_upside_down_warns(letter_t):
     from shapely import affinity
 

@@ -45,6 +45,7 @@ class FlatRegions:
     style: str = "pocket"
     ring_bottom: float | None = None  # ring style: bottom of the band
     ring_rest: float | None = None  # ring style: where the object's wide part meets the ring (None: nowhere)
+    plate_below: float = 0.0  # ring style: how far the back plate reaches below the sloped supports
 
 
 def pocket_top(pc: Polygon, fp: FlatParams) -> float:
@@ -147,14 +148,15 @@ def _ring_regions(outline: Polygon, pc: Polygon, u, fp: FlatParams, pb: Pegboard
     r = pb.peg_d / 2
     xmin, _, xmax, _ = ring.bounds
     layout = layout_pegs(xmin, xmax, bottom + pb.tab_margin + r, top - pb.tab_margin - r, pb)
-    tab = layout.tab(pb.tab_margin, y_floor)
+    plate_bottom = y_floor - fp.plate_below  # at the board; the 3D build slopes it like the supports
+    tab = layout.tab(pb.tab_margin, plate_bottom)
     rr = min(4.0, pb.tab_margin)
     tab = tab.buffer(-rr).buffer(rr, quad_segs=8) if rr > 0 else tab
-    tab = above(sweep_down(tab), y_floor)  # square bottom: it stands on the bed
+    tab = above(sweep_down(tab), plate_bottom)
     back = union([ring, tab])
     return FlatRegions(outline=outline, grown=pc, keepout=u, pocket_top=top, lip_top=top, y_floor=y_floor,
                        back=back, walls=walls, lip=ring, pegs=layout, style="ring", ring_bottom=bottom,
-                       ring_rest=ring_rest(pc, top, fp))
+                       ring_rest=ring_rest(pc, top, fp), plate_below=fp.plate_below)
 
 
 def flat_regions(outline: Polygon, fp: FlatParams, pb: PegboardParams) -> FlatRegions:
@@ -280,14 +282,20 @@ def build_flat(outline: Polygon, fp: FlatParams, pb: PegboardParams) -> HolderRe
 
 
 def _with_ring_chamfer(parts: dict, reg: FlatRegions, bt: float, depth: float, lip_t: float) -> dict:
-    """Give the ring an underside sloping back to the board, so it prints upright."""
+    """Give the ring an underside sloping back to the board, so it prints upright. The back
+    plate's bottom follows the same slope, ``plate_below`` lower, so with 0 the whole underside
+    is one flat face the holder can lie on to print at an angle."""
     zmax = bt + depth + lip_t
     bottom = reg.ring_bottom
     yf = reg.y_floor
     x0, _, x1, _ = reg.back.bounds
-    # (z, y) half-plane above the line from (0, y_floor) to (zmax, bottom)
     k = CHAMFER_SLOPE
-    wedge = extrude_x(Polygon([(-1, yf - k), (zmax + 1, bottom + k), (zmax + 1, BIG), (-1, BIG)]), x0 - 1, x1 + 1)
+
+    def above_slope(drop):  # (z, y) half-plane above the line from (0, y_floor) to (zmax, bottom), lowered
+        return extrude_x(Polygon([(-1, yf - k - drop), (zmax + 1, bottom + k - drop), (zmax + 1, BIG),
+                                  (-1, BIG)]), x0 - 1, x1 + 1)
+
+    wedge = above_slope(0.0)
 
     def down(g):
         return clean(above(sweep_down(g), yf - 1))
@@ -299,6 +307,7 @@ def _with_ring_chamfer(parts: dict, reg: FlatRegions, bt: float, depth: float, l
         "lip": extrude_z(down(ring), bt + depth, zmax),
     }
     out = dict(parts)
+    out["back plate"] = out["back plate"] & above_slope(reg.plate_below)
     for k, extra in support.items():
         if extra.is_empty():
             continue

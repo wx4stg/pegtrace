@@ -81,7 +81,9 @@ isn't needed.
   below hangs free through it. The loops only clear the object where it sits in them: parts below that
   flare out are threaded through by tilting the object, rather than cutting the loops open.
 - The band's underside slopes back to the board at about 50° from horizontal, so it still prints upright
-  without supports.
+  without supports. The back plate's bottom follows the same slope, so the whole underside is one flat
+  face: lay it on the bed to print the holder at an angle. *Back plate below the ring supports* lowers the
+  plate by that many mm (default 0).
 - *Auto* on the Orientation step picks whichever way up a ring can hold.
 
 **Shelf mode**

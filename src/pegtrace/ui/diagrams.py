@@ -91,16 +91,19 @@ def _legend(*entries) -> str:
 LEGEND = _legend(("object", OBJECT, 0.55), ("holder", HOLDER, 0.85), ("pegboard", BOARD, 0.9))
 
 
-def _side_section(s: Sketch, top: float, bottom: float, lip_note: str) -> None:
+def _side_section(s: Sketch, top: float, bottom: float, lip_note: str, plate: bool = True,
+                  hy: float | None = None) -> None:
     """Section through the holder from the side: board, back plate, object, extra depth, lip.
-    Board on the left, front of the holder on the right; ``top``/``bottom`` bound the band."""
+    Board on the left, front of the holder on the right; ``top``/``bottom`` bound the band.
+    ``plate=False`` leaves the back plate for the caller to draw; ``hy`` is the hook's height."""
     y0, y1 = 24, s.h - 62
     bd, bp, ob, ex, lp = 52, 70, 84, 164, 176   # x of board, back plate, object, extra depth, lip
     s.rect(bd, y0, bp - bd, y1 - y0, BOARD, 0.9)
-    s.rect(bp, top, ob - bp, y1 - 10 - top, HOLDER, 0.85)       # back plate (and the tab below)
+    if plate:
+        s.rect(bp, top, ob - bp, y1 - 10 - top, HOLDER, 0.85)   # back plate (and the tab below)
     s.rect(ob, y0 + 8, ex - ob, y1 - y0 - 16, OBJECT, 0.55)
     s.rect(lp, top, 14, bottom - top, HOLDER, 0.85)              # lip / front bar
-    hy = y1 - 26                                                 # a hook through the board
+    hy = y1 - 26 if hy is None else hy                           # a hook through the board
     s.rect(40, hy - 3, bp - 40, 6, HOLDER, 0.85)
     s.rect(40, hy - 16, 6, 16, HOLDER, 0.85)
     yd = s.h - 34
@@ -146,10 +149,21 @@ def ring_sketch() -> str:
     front.dim(310, 226, 310, top, "Ring top: height on the object", 322, (top + 226) / 2, vertical=True)
     front.text(4, 236, "Set the ring top just under the wide part (or click it in the Front view).",
                anchor="start", size=9, italic=True)
-    side = Sketch(220, "Ring: side section")
-    _side_section(side, 64, 106, "Lip thickness")
+    side = Sketch(260, "Ring: side section")
+    top, bot, k = 64, 106, 0.55          # the band, and the slope of the supports under it (schematic)
+    _side_section(side, top, bot, "Lip thickness", plate=False, hy=96)
+    slope = lambda x: bot + k * (190 - x)  # noqa: E731  the sloped underside, from the front bar's front edge
+    side.poly([(176, bot), (190, bot), (176, slope(176))], HOLDER, 0.85)             # support under the front bar
+    side.poly([(70, top), (84, top), (84, slope(84)), (70, slope(70))], HOLDER, 0.85)  # back plate
+    d = 12                                                                          # "below the supports"
+    side.poly([(70, slope(70)), (84, slope(84)), (84, slope(84) + d), (70, slope(70) + d)], "none", dash=True)
+    side.line(60, slope(60), 196, slope(196), DIM, 0.8, dash=True)
+    side.dim(64, slope(70), 64, slope(70) + d, "a", 58, slope(70) + d / 2 + 4, "end")
+    for i, line in enumerate(["a: Back plate below the", "ring supports. At 0 the", "plate's bottom and the",
+                              "supports (dashed line)", "make one flat face."]):
+        side.text(204, 132 + 12 * i, line, anchor="start", size=9, color=DIM)
     side.text(194, side.h - 32, "(front bar)", anchor="start", size=9, color=DIM)
-    side.dim(206, 64, 206, 106, "Ring height", 210, 88, "start")
+    side.dim(206, top, 206, bot, "Ring height", 210, 88, "start")
     return LEGEND + front.svg() + side.svg()
 
 

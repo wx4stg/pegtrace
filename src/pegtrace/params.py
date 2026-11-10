@@ -85,6 +85,11 @@ class FlatParams(param.Parameterized):
                             doc="Height on the object (mm above its lowest point) where its wide part rests "
                                 "on the ring: the top of the ring. Click the front view to set it.")
     ring_height = param.Number(10.0, bounds=(3, 60), step=0.5, doc="Height of the ring band (mm)")
+    plate_below = param.Number(
+        0.0, bounds=(0, 100), step=0.5,
+        doc="How far the back plate reaches below the sloped supports under the ring (mm). At 0 the "
+            "plate's bottom continues their slope, so the whole underside is one flat face: lay it on the "
+            "bed to print the holder at an angle.")
     object_thickness = param.Number(
         20.0, bounds=(1, 200), step=0.5, doc="Object thickness perpendicular to the photo (mm)"
     )
@@ -138,6 +143,7 @@ _LABELS = {
     },
     FlatParams: {
         "style": "Holder style", "ring_top": "Ring top: height on the object (mm)", "ring_height": "Ring height (mm)",
+        "plate_below": "Back plate below the ring supports (mm)",
         "object_thickness": "Object thickness (mm)", "clear_xy": "Gap around outline (mm)",
         "clear_z": "Extra depth (mm)", "wall": "Wall thickness (mm)", "back_t": "Back plate thickness (mm)",
         "pocket_mode": "Pocket depth in", "pocket_percent": "Pocket depth (% of height)",
