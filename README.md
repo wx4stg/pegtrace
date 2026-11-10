@@ -13,7 +13,7 @@ locally with `panel serve`, or as a **fully static web page** with Python runnin
 
 ## Workflow
 
-1. **Photo**: upload a photo, or try the built-in sample.
+1. **Photo**: upload a photo.
    - Lay the object flat on a sheet of paper (or next to a ruler) and shoot from roughly above.
    - All four paper corners must be visible.
 2. **Scale**: two choices.

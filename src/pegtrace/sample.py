@@ -1,7 +1,6 @@
 """Synthetic sample photo: a hammer-like tool on US Letter paper, in perspective.
 
-Used by the app's "Try the sample photo" button, by tests and by
-``scripts/make_sample.py``.
+Used by the tests and by ``scripts/make_sample.py``.
 """
 
 from __future__ import annotations

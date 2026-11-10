@@ -13,11 +13,23 @@ def app():
     return create_app()
 
 
+def load_sample(load):
+    """Upload the synthetic sample photo through the Photo step's file input."""
+    import io
+
+    from pegtrace.sample import make_photo
+
+    buf = io.BytesIO()
+    make_photo()[0].save(buf, format="JPEG", quality=92)
+    load.file.filename = "sample.jpg"
+    load.file.value = buf.getvalue()
+
+
 def test_full_ui_flow(app):
     state, steps = app.state, app.steps
     load, cal, trace, orient, design, export = steps
     tabs = app[1]
-    load._on_sample(None)
+    load_sample(load)
     assert state.photo is not None and tabs.active == 1
     cal._on_apply(None)
     assert state.calibration is not None and tabs.active == 2
@@ -53,7 +65,7 @@ def test_export_file_names(app):
 
 def test_lasso_and_edit(app):
     state, steps = app.state, app.steps
-    steps[0]._on_sample(None)
+    load_sample(steps[0])
     steps[1]._on_apply(None)
     steps[2]._on_lasso(np.array([[20, 20], [120, 25], [110, 200], [30, 190]], float))
     assert state.outline is not None and state.outline.area > 10000
@@ -66,7 +78,7 @@ def test_lasso_and_edit(app):
 
 def test_corner_drag_updates_state(app):
     state, steps = app.state, app.steps
-    steps[0]._on_sample(None)
+    load_sample(steps[0])
     h = state.photo.size[1]
     steps[1]._on_corner_draw({"x": [10, 20, 30, 40], "y": [h - 1, h - 2, h - 3, h - 4]})
     assert state.corners_px[0] == (10.0, 1.0)
@@ -74,7 +86,7 @@ def test_corner_drag_updates_state(app):
 
 def test_design_update_button(app):
     state, steps = app.state, app.steps
-    steps[0]._on_sample(None)
+    load_sample(steps[0])
     steps[1]._on_apply(None)
     steps[2]._on_auto(None)
     state.auto_direction()
@@ -106,3 +118,15 @@ def test_setting_diagrams_are_valid_svg():
         html = sketch()
         assert html.count("<svg") == 2, kind  # two views each
         ET.fromstring(f"<root>{html.replace('&nbsp;', ' ')}</root>")  # well-formed
+
+
+def test_photo_upload_messages(app):
+    load = app.steps[0]
+    load_sample(load)
+    assert "Loaded **sample.jpg** (1600 × 1200 px)" in load.alert.object
+    # the static site sends the file's name after its contents
+    load.file.param.update(filename=None)
+    load.file.value = load.file.value + b"\0"  # a different upload, still a valid JPEG
+    assert "Loaded the photo (1600 × 1200 px)" in load.alert.object
+    load.file.filename = "later.jpg"
+    assert app.state.photo_name == "later.jpg" and "Loaded **later.jpg**" in load.alert.object

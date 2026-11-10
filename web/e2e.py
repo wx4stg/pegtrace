@@ -24,6 +24,19 @@ from pathlib import Path
 from playwright.sync_api import Page, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
+DATA = ROOT / "build" / "e2e-data"
+
+
+def test_photos() -> Path:
+    """The synthetic sample photo as a JPEG."""
+    sys.path.insert(0, str(ROOT / "src"))
+    from pegtrace.sample import make_photo
+
+    DATA.mkdir(parents=True, exist_ok=True)
+    jpg = DATA / "sample_photo.jpg"
+    if not jpg.exists():
+        make_photo()[0].save(jpg, quality=92)
+    return jpg
 
 
 def free_port() -> int:
@@ -168,14 +181,20 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
         print(f"opening {url}")
         t0 = time.time()
         page.goto(url)
-        r.wait_text("Try the sample photo", timeout=boot_timeout * 1000)
+        r.wait_text("Photograph the object", timeout=boot_timeout * 1000)
         print(f"  app ready after {time.time() - t0:.1f}s")
 
         print("step 1: photo")
 
         r.step = "step 1: photo"
-        r.click("Try the sample photo")
-        r.wait_text("Loaded the sample photo")
+        jpg = test_photos()
+        r.check(page.get_by_role("button", name="Try the sample photo").count() == 0, "no sample photo button")
+        photo_input = page.locator("input[type=file][accept*='.jpg']")
+        photo_input.set_input_files(str(jpg))
+        page.get_by_role("button", name="Apply scale").wait_for(state="visible", timeout=60_000)
+        r.tab("1 · Photo")
+        r.wait_text("Loaded sample_photo.jpg (1600 × 1200 px)")
+        r.tab("2 · Scale")
         page.wait_for_timeout(1500)
         r.shot("scale_step")
 
