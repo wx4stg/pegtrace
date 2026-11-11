@@ -238,3 +238,24 @@ def test_walls_are_never_thinner_than_the_setting(pliers, style, wall):
     r = build_flat(pliers, fp, PegboardParams())
     assert r.solid.is_valid() and r.solid.num_components() == 1
     assert (r.solid & r.keepout).volume() == pytest.approx(0, abs=1e-3)
+
+
+@pytest.mark.parametrize("wall", [1.2, 2.4, 4.0])
+def test_ring_supports_follow_leaning_legs(pliers, wall):
+    """Below the ring the legs lean out past its edge. The supports under each wall must follow
+    them out at full thickness, not taper away to nothing."""
+    from shapely.geometry import LineString
+
+    fp = FlatParams(style="ring", ring_top=99, wall=wall)
+    r = build_flat(pliers, fp, PegboardParams())
+    assert r.solid.is_valid() and r.solid.num_components() == 1
+    bottom = pliers.bounds[1] + fp.ring_top - fp.ring_height
+    for drop in (1.0, 4.0):  # just under the ring, and lower down the slope
+        y = bottom - drop
+        sec = r.solid.slice(fp.back_t + 0.5).to_shapely()  # through the walls, near the board
+        cut = sec.intersection(LineString([(-200, y), (200, y)]))
+        pieces = sorted(getattr(cut, "geoms", [cut]), key=lambda g: g.bounds[0])
+        # outside and inside of each leg (the two inside ones merge when the walls are thick)
+        assert len(pieces) in (3, 4), (drop, cut)
+        assert min(p.length for p in pieces) >= wall - 0.1, (drop, [p.length for p in pieces])
+    assert (r.solid & r.ghost).volume() == pytest.approx(0, abs=1e-3)

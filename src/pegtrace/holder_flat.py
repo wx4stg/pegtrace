@@ -331,12 +331,13 @@ def _with_ring_chamfer(parts: dict, reg: FlatRegions, bt: float, depth: float, l
     zmax = bt + depth + lip_t
     bottom = reg.ring_bottom
     yf = reg.y_floor
-    x0, _, x1, _ = reg.back.bounds
+    x0, _, x1, _ = union([reg.back, below(reg.cleared, bottom)]).bounds  # supports may follow the object out
+    x0, x1 = x0 - reg.wall - 1, x1 + reg.wall + 1
     k = CHAMFER_SLOPE
 
     def above_slope(drop):  # (z, y) half-plane above the line from (0, y_floor) to (zmax, bottom), lowered
         return extrude_x(Polygon([(-1, yf - k - drop), (zmax + 1, bottom + k - drop), (zmax + 1, BIG),
-                                  (-1, BIG)]), x0 - 1, x1 + 1)
+                                  (-1, BIG)]), x0, x1)
 
     wedge = above_slope(0.0)
 
@@ -344,17 +345,20 @@ def _with_ring_chamfer(parts: dict, reg: FlatRegions, bt: float, depth: float, l
         return clean(above(sweep_down(g), yf - 1))
 
     ring = reg.lip
-    # Under the walls, minus the space the object hangs in. Where a leaning part of the object
-    # cuts into that, the support also reaches out to a full wall's thickness from it (still
-    # under the ring), so it doesn't taper to a sliver.
+    # Under the walls, minus the space the object hangs in. Where a part of the object leans
+    # out under a wall, the support follows it out to a full wall's thickness, even past the
+    # ring's edge, instead of tapering to a sliver. Never under the ring's openings, though:
+    # parts there narrowing downwards would trap the wider parts above them.
     hanging = clean(below(reg.cleared, bottom))  # the object below the ring
-    near = clean(hanging.buffer(reg.wall, quad_segs=12).intersection(below(down(ring), bottom)))
+    openings = down(clean(reg.cleared.intersection(rect(*ring.bounds[:2], *ring.bounds[2:]))))
+    near = clean(below(hanging.buffer(reg.wall, quad_segs=12), bottom).difference(openings))
     support_walls = clean(union([down(reg.walls), near]).difference(reg.cleared))
     support_walls = without_thin_parts(support_walls, reg.wall)
+    under = union([down(ring), support_walls])
     support = {
-        "back plate": extrude_z(down(ring), 0.0, bt),
+        "back plate": extrude_z(under, 0.0, bt),
         "walls": extrude_z(support_walls, bt, bt + depth),
-        "lip": extrude_z(down(ring), bt + depth, zmax),
+        "lip": extrude_z(under, bt + depth, zmax),
     }
     out = dict(parts)
     out["back plate"] = out["back plate"] & above_slope(reg.plate_below)
