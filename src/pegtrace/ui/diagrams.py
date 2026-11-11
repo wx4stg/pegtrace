@@ -7,6 +7,7 @@ so the sketches follow the page's text colour.
 
 from __future__ import annotations
 
+import math
 from html import escape
 
 OBJECT = "#5b6b8c"
@@ -259,27 +260,38 @@ def pegs_sketch() -> str:
         side.line(bx0, hy - 9, bx1, hy - 9, sw=0.6)
         side.line(bx0, hy + 9, bx1, hy + 9, sw=0.6)
     side.rect(bx1, 40, 16, 150, HOLDER, 0.85)                           # back plate
-    # L-hook through the upper hole, rising behind the board
-    hy, r = 72, 6
-    side.rect(98, hy - r, bx1 - 98, 2 * r, HOLDER, 0.85)
-    side.rect(98, hy - 32, 2 * r, 32 - r, HOLDER, 0.85)
-    side.circle(98 + r, hy - 32, r, HOLDER, 0.85)
+    # hook through the upper hole, curving up behind the board
+    hy, r, xs, big = 72, 6, 110, 22                                     # peg axis, radius, curve start, radius
+    tip = hy - 38
+
+    def arc(rad, a0, a1):  # points on a circle about the curve's centre (SVG y points down)
+        return [(xs + rad * math.cos(math.radians(a)), hy - big + rad * math.sin(math.radians(a)))
+                for a in (a0 + (a1 - a0) * i / 12 for i in range(13))]
+
+    xr = xs - big                                                       # the rise's axis
+    cap = [(xr + r * math.cos(math.radians(a)), tip - r * math.sin(math.radians(a))) for a in range(180, -1, -15)]
+    side.poly([(bx1, hy + r), *arc(big + r, 90, 180), *cap, *arc(big - r, 180, 90), (bx1, hy - r)],
+              HOLDER, 0.85)
+    side.line(xs, hy - big, xs - (big - r) * 0.707, hy - big + (big - r) * 0.707, dash=True, sw=0.6)
+    side.leader(xs - (big - r) * 0.5, hy - big + (big - r) * 0.3, 160, 22, "Hook bend radius")
     # straight pin through the lower hole
     side.rect(126, 158 - r, bx1 - 126, 2 * r, HOLDER, 0.85)
     side.dim(bx0, 200, bx1, 200, "Board thickness", 133, 212)
     side.line(bx0, 186, bx0, 204, dash=True, sw=0.6)
     side.line(bx1, 186, bx1, 204, dash=True, sw=0.6)
-    side.dim(98, 98, bx0, 98, "Extra peg length", 94, 102, "end")
-    side.line(98, hy + r, 98, 102, dash=True, sw=0.6)
+    side.dim(xs, 98, bx0, 98, "Extra peg length", xs - 4, 102, "end")
+    side.line(xs, hy + r, xs, 102, dash=True, sw=0.6)
     side.line(bx0, 90, bx0, 102, dash=True, sw=0.6)
-    side.dim(84, hy - r, 84, hy - 32, "Hook rise", 80, hy - 16, "end")
+    side.line(xr - r - 2, tip, 60, tip, dash=True, sw=0.6)
+    side.line(xr + 2, hy, 60, hy, dash=True, sw=0.6)
+    side.dim(64, hy, 64, tip, "Hook rise", 60, (hy + tip) / 2 + 3, "end")
     side.dim(176, hy - 9, 176, hy + 9, "Hole diameter", 182, hy - 2, "start")
     side.text(182, hy + 10, "(peg = hole − Peg clearance)", anchor="start", size=9)
     side.dim(200, hy, 200, 158, "Pins: holes below hooks", 204, 118, "start")
     side.line(162, hy, 204, hy, dash=True, sw=0.6)
     side.line(162, 158, 204, 158, dash=True, sw=0.6)
     side.dim(126, 176, bx1, 176, "Pin length", 112, 180, "end")
-    side.text(bx0 - 4, 30, "back of board", anchor="end", size=9)
+    side.text(bx0 - 4, 140, "back of board", anchor="end", size=9)
     side.text(bx1 + 20, 34, "holder", anchor="start", size=9)
     front = Sketch(176, "Pegs: front view of the board")
     sp = 34

@@ -14,7 +14,7 @@ from ..vtkjs import scene_pane
 from .common import FILL_WINDOW, TABS_CSS, help_text, run_busy, show, status_alert
 from .diagrams import SKETCHES
 
-PEG_FIELDS = ["preset", "spacing", "hole_d", "board_t", "peg_clear", "board_clear", "hook_rise", "columns",
+PEG_FIELDS = ["preset", "spacing", "hole_d", "board_t", "peg_clear", "board_clear", "hook_rise", "hook_bend", "columns",
               "max_pegs", "stride", "add_pins", "pin_rows", "pin_length", "peg_profile", "tab_margin"]
 RING_FIELDS = ["style", "ring_top", "ring_height", "object_thickness", "clear_xy", "clear_z", "wall", "back_t",
                "plate_below", "lip_t"]

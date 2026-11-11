@@ -96,20 +96,57 @@ def _horizontal_peg(x: float, y: float, z_back: float, profile: Polygon, chamfer
     return body.translate(x, y, 0)
 
 
+MAX_BEND = 60.0  # mm: cap on the auto bend radius when the peg barely clears the hole
+
+
+def auto_hook_bend(pb: PegboardParams) -> float:
+    """Smallest inner bend radius that lets the hook turn through a hole.
+
+    The hook goes in tip first and is turned down, so the curve slides through the hole
+    (length: board thickness t, room to spare: c = hole - peg diameter). A curve of inner
+    radius a crossing it spans, across the hole, (a + d) - sqrt(a^2 - t^2 / 4) for a peg of
+    diameter d; that fits in d + c when a >= (t^2 / 4 + c^2) / (2 c). 10% extra for printing.
+    """
+    c = max(pb.hole_d - pb.peg_d, 0.05)
+    a = (pb.board_t**2 / 4 + c**2) / (2 * c)
+    return min(1.1 * a, MAX_BEND)
+
+
+def hook_bend(pb: PegboardParams) -> float:
+    return pb.hook_bend if pb.hook_bend > 0 else auto_hook_bend(pb)
+
+
+def _hook(x: float, y: float, r: float, prof: Polygon, pb: PegboardParams, seg: int) -> list[Solid]:
+    """Peg straight through the board (plus the extra length), then curving up behind it
+    to ``hook_rise`` above the peg's axis: a quarter circle and a straight rise when the rise
+    is taller than the curve, otherwise a shorter arc ending at that height."""
+    z_s = -(pb.board_t + pb.board_clear)  # the curve starts just behind the board
+    if pb.hook_rise <= 0:
+        return [_horizontal_peg(x, y, z_s - r, prof), Solid.sphere(r, seg).translate(x, y, z_s - r)]
+    big = hook_bend(pb) + r  # radius of the curve's centre line
+    angle = math.degrees(math.acos(max(1 - pb.hook_rise / big, 0.0)))  # 90 when the rise is taller
+    # tube revolved about the z axis from +x towards +y, turned so it starts at the peg's end,
+    # heading back (-z), and curves up: local x -> -y, local y -> -z, the axis (local z) -> x
+    arc = (Section.from_shapely(Point(big, 0).buffer(r, quad_segs=seg // 4))
+           .revolve(angle, segments=max(seg * 2, 64)).rotate(0, 90, 0).rotate(-90, 0, 0))
+    parts = [_horizontal_peg(x, y, z_s, prof), arc.translate(x, y + big, z_s)]
+    a = math.radians(angle)
+    ty, tz = y + big * (1 - math.cos(a)), z_s - big * math.sin(a)  # end of the curve
+    if pb.hook_rise > big:
+        rod = Solid.cylinder(pb.hook_rise - big, r, r, seg).rotate(-90, 0, 0)  # axis -> +y
+        parts.append(rod.translate(x, ty, tz))
+        ty = y + pb.hook_rise
+    parts.append(Solid.sphere(r, seg).translate(x, ty, tz))
+    return parts
+
+
 def peg_solids(layout: PegLayout, pb: PegboardParams) -> Solid:
     r = layout.radius
     prof = peg_profile(r, pb.peg_profile)
-    z_inner = -(pb.board_t + pb.board_clear)  # hook's inner face
-    z_hook = z_inner - r  # hook rod axis
     seg = 32
     parts: list[Solid] = []
     for x, y in layout.hooks:
-        parts.append(_horizontal_peg(x, y, z_hook, prof))
-        parts.append(Solid.sphere(r, seg).translate(x, y, z_hook))
-        if pb.hook_rise > 0:
-            rod = Solid.cylinder(pb.hook_rise, r, r, seg).rotate(-90, 0, 0)  # axis -> +y
-            parts.append(rod.translate(x, y, z_hook))
-            parts.append(Solid.sphere(r, seg).translate(x, y + pb.hook_rise, z_hook))
+        parts.extend(_hook(x, y, r, prof, pb, seg))
     pin_len = pb.pin_length if pb.pin_length > 0 else 0.75 * pb.board_t
     for x, y in layout.pins:
         parts.append(_horizontal_peg(x, y, -pin_len, prof, chamfer=min(1.0, pin_len / 3)))

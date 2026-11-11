@@ -47,6 +47,13 @@ class PegboardParams(param.Parameterized):
     hook_rise = param.Number(
         8.0, bounds=(0, 40), step=0.5, doc="How far the hook tip rises behind the board (mm)"
     )
+    hook_bend = param.Number(
+        0.0, bounds=(0, 60), step=0.5,
+        doc="Inner radius of the curve from the peg up into the hook (mm). The hook goes into the board "
+            "tip first and is turned down into place; a sharp corner can't turn through the hole. "
+            "0 = auto: just round enough to turn through, which depends on the board thickness and the "
+            "peg clearance (more clearance allows a tighter curve).",
+    )
     columns = param.Integer(0, bounds=(0, 12), doc="Number of peg columns (0 = auto)")
     max_pegs = param.Integer(3, bounds=(1, 12), doc="Max columns when auto")
     stride = param.Integer(1, bounds=(1, 6), doc="Use every Nth hole horizontally")
@@ -136,7 +143,8 @@ _LABELS = {
     PegboardParams: {
         "preset": "Pegboard type", "spacing": "Hole spacing (mm)", "hole_d": "Hole diameter (mm)",
         "board_t": "Board thickness (mm)", "peg_clear": "Peg clearance (mm)", "board_clear": "Extra peg length (mm)",
-        "hook_rise": "Hook rise (mm)", "columns": "Peg columns (0 = auto)", "max_pegs": "Max columns (auto)",
+        "hook_rise": "Hook rise (mm)",
+        "hook_bend": "Hook bend radius (mm, 0 = auto)", "columns": "Peg columns (0 = auto)", "max_pegs": "Max columns (auto)",
         "stride": "Use every Nth hole", "add_pins": "Anti-tilt pins", "pin_rows": "Pins: holes below hooks",
         "pin_length": "Pin length (mm, 0 = auto)", "peg_profile": "Peg profile",
         "tab_margin": "Plate margin around pegs (mm)",

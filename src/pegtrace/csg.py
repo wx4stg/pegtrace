@@ -66,6 +66,9 @@ class _PyBackend:
     def extrude(self, cs, height, scale_top):
         return cs.extrude(height, 0, 0.0, (float(scale_top), float(scale_top)))
 
+    def revolve(self, cs, segments, degrees):
+        return cs.revolve(int(segments), float(degrees))
+
     # solids
     def empty(self):
         return self.m3.Manifold()
@@ -197,6 +200,9 @@ class _JsBackend:
 
     def extrude(self, cs, height, scale_top):
         return cs.extrude(float(height), 0, 0.0, self._to_js([float(scale_top), float(scale_top)]))
+
+    def revolve(self, cs, segments, degrees):
+        return cs.revolve(int(segments), float(degrees))
 
     # solids
     def empty(self):
@@ -340,6 +346,13 @@ class Section:
         if self.is_empty() or height <= 0:
             return Solid.empty()
         return Solid(backend().extrude(self._h, height, scale_top))
+
+    def revolve(self, degrees: float = 360.0, segments: int = DEFAULT_SEGMENTS) -> "Solid":
+        """Revolve the part at x >= 0 about the Y axis, which becomes the Z axis: a point (x, y)
+        sweeps from (x, 0, y) towards +Y by ``degrees``. ``segments`` is per full turn."""
+        if self.is_empty() or degrees <= 0:
+            return Solid.empty()
+        return Solid(backend().revolve(self._h, segments, degrees))
 
 
 class Solid:
