@@ -8,7 +8,7 @@ INCH = 25.4
 
 PEGBOARD_PRESETS: dict[str, dict[str, float]] = {
     "US 1/4 in hardboard (1 in grid, 1/4 in holes)": dict(
-        spacing=25.4, hole_d=0.25 * INCH, board_t=0.25 * INCH
+        spacing=25.4, hole_d=5.8, board_t=0.25 * INCH, hook_bend=2.5  # holes measured on a real board
     ),
     "US 1/8 in hardboard (1 in grid, 3/16 in holes)": dict(
         spacing=25.4, hole_d=3 / 16 * INCH, board_t=0.125 * INCH
@@ -31,7 +31,7 @@ class PegboardParams(param.Parameterized):
     """Pegboard geometry and peg/hook design."""
 
     preset = param.Selector(
-        default=CUSTOM,
+        default=next(iter(PEGBOARD_PRESETS)),
         objects=[*PEGBOARD_PRESETS, CUSTOM],
         doc="Common pegboard types. Pick Custom to keep your own values.",
     )
