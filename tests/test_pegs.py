@@ -46,7 +46,7 @@ def turns_through(pb, steps=40):
                                     "Metric 25 mm grid (5 mm holes)"])
 @pytest.mark.parametrize("peg_clear", [0.5, 1.0])
 def test_hook_turns_into_the_board(preset, peg_clear):
-    pb = PegboardParams(preset=preset, peg_clear=peg_clear)
+    pb = PegboardParams(preset=preset, peg_clear=peg_clear, hook_bend=0)  # auto
     assert turns_through(pb)
     # a sharp corner (the old L-hook) does not
     assert not turns_through(PegboardParams(preset=preset, peg_clear=peg_clear, hook_bend=0.5))

@@ -102,9 +102,10 @@ isn't needed.
   every Nth hole.
 - The top row has **hooks**: a teardrop or round peg goes through the board, then curves up behind it to the
   hook rise. A hook goes in tip first and is turned down into place, so the curve has to slide through the
-  hole; a sharp corner can't. By default (Hook bend radius 0) the curve is just round enough for the board
-  thickness and peg clearance. A tight peg needs a gentle curve that reaches further behind the board: with
-  1/4″ board and 0.5 mm clearance the bend is about 11 mm, and with 1 mm clearance about 6 mm.
+  hole; a sharp corner can't. The default Hook bend radius is 2.5 mm. At 0 (auto) the curve is just round
+  enough, in theory, for the board thickness and peg clearance. That is much gentler for a tight peg, and it
+  reaches further behind the board: with 1/4″ board and 0.5 mm clearance it is about 11 mm, and with 1 mm
+  clearance about 6 mm.
 - An optional lower row of straight **anti-tilt pins** has chamfered tips.
 - Board presets: US 1/4″ (1″ grid, 1/4″ holes), US 1/8″ (1″ grid, 3/16″ holes), metric 25 mm, or custom.
 

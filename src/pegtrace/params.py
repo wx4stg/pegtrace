@@ -31,12 +31,12 @@ class PegboardParams(param.Parameterized):
     """Pegboard geometry and peg/hook design."""
 
     preset = param.Selector(
-        default=next(iter(PEGBOARD_PRESETS)),
+        default=CUSTOM,
         objects=[*PEGBOARD_PRESETS, CUSTOM],
         doc="Common pegboard types. Pick Custom to keep your own values.",
     )
     spacing = param.Number(25.4, bounds=(5, 100), step=0.1, doc="Hole pitch (mm)")
-    hole_d = param.Number(6.35, bounds=(2, 20), step=0.05, doc="Hole diameter (mm)")
+    hole_d = param.Number(5.8, bounds=(2, 20), step=0.05, doc="Hole diameter (mm)")
     board_t = param.Number(6.35, bounds=(1, 25), step=0.05, doc="Board thickness (mm)")
     peg_clear = param.Number(
         0.5, bounds=(0, 3), step=0.05, doc="Peg diameter is hole diameter minus this (mm)"
@@ -48,7 +48,7 @@ class PegboardParams(param.Parameterized):
         8.0, bounds=(0, 40), step=0.5, doc="How far the hook tip rises behind the board (mm)"
     )
     hook_bend = param.Number(
-        0.0, bounds=(0, 60), step=0.5,
+        2.5, bounds=(0, 60), step=0.5,
         doc="Inner radius of the curve from the peg up into the hook (mm). The hook goes into the board "
             "tip first and is turned down into place; a sharp corner can't turn through the hole. "
             "0 = auto: just round enough to turn through, which depends on the board thickness and the "
@@ -88,7 +88,7 @@ class FlatParams(param.Parameterized):
         doc="Ring: a band around a narrow part, with a wider part above resting on it (hammer head, "
             "the bar of a T, pliers joint). Pocket: a cradle around the bottom of the object.",
     )
-    ring_top = param.Number(40.0, bounds=(0.5, 1000), step=0.5,
+    ring_top = param.Number(105.0, bounds=(0.5, 1000), step=0.5,
                             doc="Height on the object (mm above its lowest point) where its wide part rests "
                                 "on the ring: the top of the ring. Click the front view to set it.")
     ring_height = param.Number(10.0, bounds=(3, 60), step=0.5, doc="Height of the ring band (mm)")
@@ -98,9 +98,9 @@ class FlatParams(param.Parameterized):
             "plate's bottom continues their slope, so the whole underside is one flat face: lay it on the "
             "bed to print the holder at an angle.")
     object_thickness = param.Number(
-        20.0, bounds=(1, 200), step=0.5, doc="Object thickness perpendicular to the photo (mm)"
+        15.0, bounds=(1, 200), step=0.5, doc="Object thickness perpendicular to the photo (mm)"
     )
-    clear_xy = param.Number(1.0, bounds=(0, 10), step=0.1, doc="Gap around the outline (mm)")
+    clear_xy = param.Number(1.5, bounds=(0, 10), step=0.1, doc="Gap around the outline (mm)")
     clear_z = param.Number(1.0, bounds=(0, 10), step=0.1, doc="Extra depth beyond object thickness (mm)")
     wall = param.Number(2.4, bounds=(0.8, 15), step=0.1, doc="Wall thickness (mm)")
     back_t = param.Number(3.0, bounds=(1, 15), step=0.1, doc="Back plate thickness (mm)")

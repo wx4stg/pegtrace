@@ -295,16 +295,17 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
         r.shot("ring_default")
         boxes = page.get_by_role("textbox").locator("visible=true")
         ring_top, ring_height = boxes.nth(0), boxes.nth(1)
-        r.check(ring_top.input_value() == "40" and ring_height.input_value() == "10",
+        default_top = "105"  # FlatParams.ring_top's default
+        r.check(ring_top.input_value() == default_top and ring_height.input_value() == "10",
                 f"ring top and height have boxes to type in ({ring_top.input_value()}, {ring_height.input_value()})")
         # a click on the front view sets the ring top
         fb = r.visible_canvas()
         page.mouse.click(fb["x"] + fb["width"] / 2, fb["y"] + fb["height"] * 0.3)
         for _ in range(240):
-            if ring_top.input_value() != "40":
+            if ring_top.input_value() != default_top:
                 break
             page.wait_for_timeout(250)
-        r.check(ring_top.input_value() != "40", f"clicking the front view set the ring top ({ring_top.input_value()})")
+        r.check(ring_top.input_value() != default_top, f"clicking the front view set the ring top ({ring_top.input_value()})")
         r.wait_text("Settings changed", timeout=30_000)
         # type the suggested ring top and a taller ring, then update
         ring_top.fill(top)
