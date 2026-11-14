@@ -39,7 +39,7 @@ class ExportStep:
     def _project_name(self):
         return self._named(self.state.export.project_filename, "pegtrace_project.json", ".json")
 
-    def _sync_names(self, _=None):
+    def _sync_names(self, *_):  # one event per name; loading a project changes both at once
         self.stl.filename = self._stl_name()
         self.save.filename = self._project_name()
 

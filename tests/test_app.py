@@ -157,3 +157,21 @@ def test_load_project_without_photo(app):
     bx0, by0, bx1, by1 = cal_rgb(None, state.raw_outline).bounds.lbrt()
     x0, y0, x1, y1 = state.raw_outline.bounds
     assert bx0 < x0 and by0 < y0 and bx1 > x1 and by1 > y1
+
+
+def test_load_project_with_other_file_names(app):
+    """A saved project carries both file names; loading it changes them together (once failed:
+    the name watcher got two events)."""
+    import json
+
+    state, steps = app.state, app.steps
+    load_sample(steps[0])
+    steps[1]._on_apply(None)
+    steps[2]._on_auto(None)
+    export = steps[-1]
+    data = json.loads(export._project().getvalue())
+    data["export"].update(filename="cutters.stl", project_filename="cutters.json")
+    export.load.value = json.dumps(data).encode()
+    assert "Could not" not in export.alert.object, export.alert.object
+    assert export.stl.filename == "cutters.stl"
+    assert state.outline is not None
