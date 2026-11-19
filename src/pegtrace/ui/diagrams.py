@@ -120,94 +120,74 @@ def _side_section(s: Sketch, top: float, bottom: float, lip_note: str, plate: bo
     s.text(4, s.h - 4, "side section: board on the left, front on the right", anchor="start", size=9, italic=True)
 
 
-def ring_sketch() -> str:
-    front = Sketch(240, "Ring: front view")
-    # back plate behind the stem, with a peg
-    front.rect(132, 70, 76, 110, HOLDER, 0.3, dash=True)
-    front.circle(170, 160, 5, HOLDER, 0.9)
-    # the object: a T, wide part on top
-    front.rect(80, 26, 180, 34, OBJECT, 0.55)
-    front.rect(150, 60, 40, 166, OBJECT, 0.55)
-    # ring band: side walls and the front bar across the stem
-    top, bot = 64, 106
-    front.rect(118, top, 20, bot - top, HOLDER, 0.85)
-    front.rect(202, top, 20, bot - top, HOLDER, 0.85)
-    front.rect(118, top, 104, 14, HOLDER, 0.55)                  # front bar (lip thickness deep)
-    front.poly([(118, bot), (138, bot), (138, bot + 14)], HOLDER, 0.5)   # chamfered underside
-    front.poly([(222, bot), (202, bot), (202, bot + 14)], HOLDER, 0.5)
-    front.dim(236, top, 236, bot, "Ring height", 240, (top + bot) / 2 + 3, "start")
-    front.dim(118, bot + 26, 138, bot + 26, "Wall", 112, bot + 30, "end")
-    front.dim(138, bot + 40, 150, bot + 40, "Gap around outline", 112, bot + 44, "end")
-    front.line(118, bot + 2, 118, bot + 30, dash=True, sw=0.6)
-    front.line(138, bot + 16, 138, bot + 44, dash=True, sw=0.6)
-    front.line(150, bot + 2, 150, bot + 44, dash=True, sw=0.6)
-    front.leader(222, top + 7, 264, top - 14, "front bar")
-    front.leader(170, 160, 104, 190, "back plate + pegs", anchor="end")
-    front.text(170, 46, "wide part rests on the ring", size=9, color="#fff")
-    # ring top: measured up from the object's lowest point
-    front.line(222, top, 316, top, dash=True, sw=0.6)
-    front.line(190, 226, 316, 226, dash=True, sw=0.6)
-    front.dim(310, 226, 310, top, "Ring top: height on the object", 322, (top + 226) / 2, vertical=True)
-    front.text(4, 236, "Set the ring top just under the wide part (or click it in the Front view).",
-               anchor="start", size=9, italic=True)
-    side = Sketch(260, "Ring: side section")
+def flat_sketch() -> str:
+    front = Sketch(276, "Front view: Top Y and Bottom Y")
+    y0 = 206                                                    # the objects' lowest point: 0
+    # left: a ring. A T hangs by its bar; the band circles the stem below it.
+    top, bot = 52, 90
+    front.rect(33, top, 64, 50, HOLDER, 0.3, dash=True)         # back plate behind
+    front.circle(65, 96, 4, HOLDER, 0.9)
+    front.rect(15, 26, 100, 22, OBJECT, 0.55)
+    front.rect(53, 48, 24, y0 - 48, OBJECT, 0.55)
+    front.rect(33, top, 14, bot - top, HOLDER, 0.85)
+    front.rect(83, top, 14, bot - top, HOLDER, 0.85)
+    front.poly([(33, bot), (47, bot), (47, bot + 12)], HOLDER, 0.5)   # sloped supports under the ring
+    front.poly([(97, bot), (83, bot), (83, bot + 12)], HOLDER, 0.5)
+    front.line(97, top, 126, top, dash=True, sw=0.6)
+    front.line(97, bot, 146, bot, dash=True, sw=0.6)
+    front.dim(122, y0, 122, top, "Top Y", 130, 150, vertical=True)
+    front.dim(142, y0, 142, bot, "Bottom Y", 150, 160, vertical=True)
+    front.dim(33, 222, 47, 222, "Wall", 58, 226, "start")
+    front.dim(47, 236, 53, 236, "Gap around outline", 58, 240, "start")
+    for x in (33, 47, 53):
+        front.line(x, bot + 14 if x != 53 else y0, x, 240, dash=True, sw=0.6)
+    front.text(80, 268, "Bottom Y above 0: a ring", size=10)
+    # right: a pocket. A hammer sits head down in a cup with a floor.
+    hx0, hx1, ptop, fl = 196, 284, 140, 218
+    gap, wall, ov = 4, 10, 8
+    cx = (hx0 + hx1) / 2
+    front.rect(cx - 20, 100, 40, fl - 100, HOLDER, 0.3, dash=True)  # back plate behind
+    front.circle(cx, 116, 4, HOLDER, 0.9)
+    front.poly([(hx0 - gap - wall, ptop), (hx0 - gap, ptop), (hx0 - gap, y0 + gap), (hx1 + gap, y0 + gap),
+                (hx1 + gap, ptop), (hx1 + gap + wall, ptop), (hx1 + gap + wall, fl), (hx0 - gap - wall, fl)],
+               HOLDER, 0.85)
+    front.rect(hx0, 174, hx1 - hx0, y0 - 174, OBJECT, 0.55)
+    front.rect(cx - 12, 40, 24, 134, OBJECT, 0.55)
+    # lip in front: covers the gap and the object's edge by the overlap
+    front.poly([(hx0 - gap - wall, ptop), (hx0 + ov, ptop), (hx0 + ov, y0 - ov), (hx1 - ov, y0 - ov),
+                (hx1 - ov, ptop), (hx1 + gap + wall, ptop), (hx1 + gap + wall, fl), (hx0 - gap - wall, fl)],
+               HOLDER, 0.25, dash=True)
+    front.dim(hx0, 128, hx0 + ov, 128, "Lip overlap", hx0 - 4, 124, "end")
+    front.line(hx0, 128, hx0, 172, dash=True, sw=0.6)
+    front.line(hx0 + ov, 128, hx0 + ov, ptop, dash=True, sw=0.6)
+    front.circle(cx, ptop, 11, "none", dash=True, stroke=DIM)
+    front.leader(cx + 9, ptop - 6, 262, 98, "Thumb notch")
+    front.line(hx1 + gap + wall, ptop, 330, ptop, dash=True, sw=0.6)
+    front.line(hx1 + gap + wall, fl, 336, fl, dash=True, sw=0.6)
+    front.dim(318, y0, 318, ptop, "Top Y", 326, 173, vertical=True)
+    front.dim(332, y0, 332, fl, "", 0, 0)
+    front.text(328, 236, "Bottom Y below 0", anchor="end", size=10, color=DIM)
+    front.text(328, 248, "(a floor)", anchor="end", size=9, color=DIM)
+    front.text(258, 268, "Bottom Y below 0: a pocket", size=10)
+    front.leader(hx1 + gap + 5, y0 - 30, 336, 72, "lip (in front)", anchor="end")
+    # 0: the objects' lowest point
+    front.line(4, y0, 336, y0, color=DIM, dash=True, sw=0.8)
+    front.text(160, y0 - 4, "0", size=10, color=DIM)
+    side = Sketch(260, "Side section (a ring)")
     top, bot, k = 64, 106, 0.55          # the band, and the slope of the supports under it (schematic)
     _side_section(side, top, bot, "Lip thickness", plate=False, hy=96)
     slope = lambda x: bot + k * (190 - x)  # noqa: E731  the sloped underside, from the front bar's front edge
-    side.poly([(176, bot), (190, bot), (176, slope(176))], HOLDER, 0.85)             # support under the front bar
+    side.poly([(176, bot), (190, bot), (176, slope(176))], HOLDER, 0.85)             # support under the lip
     side.poly([(70, top), (84, top), (84, slope(84)), (70, slope(70))], HOLDER, 0.85)  # back plate
     d = 12                                                                          # "below the supports"
     side.poly([(70, slope(70)), (84, slope(84)), (84, slope(84) + d), (70, slope(70) + d)], "none", dash=True)
     side.line(60, slope(60), 196, slope(196), DIM, 0.8, dash=True)
     side.dim(64, slope(70), 64, slope(70) + d, "a", 58, slope(70) + d / 2 + 4, "end")
     for i, line in enumerate(["a: Back plate below the", "ring supports. At 0 the", "plate's bottom and the",
-                              "supports (dashed line)", "make one flat face."]):
-        side.text(204, 132 + 12 * i, line, anchor="start", size=9, color=DIM)
-    side.text(194, side.h - 32, "(front bar)", anchor="start", size=9, color=DIM)
-    side.dim(206, top, 206, bot, "Ring height", 210, 88, "start")
-    return LEGEND + front.svg() + side.svg()
-
-
-def pocket_sketch() -> str:
-    front = Sketch(240, "Pocket: front view")
-    x0, x1, yb = 84, 204, 196       # object's head, bottom at yb
-    gap, wall, ov = 8, 12, 12
-    ptop = 112                       # pocket top
-    cx = (x0 + x1) / 2
-    # back plate behind, with pegs
-    front.rect(cx - 22, 60, 44, 140, HOLDER, 0.3, dash=True)
-    front.circle(cx, 80, 5, HOLDER, 0.9)
-    # walls: a cup around the head (nothing above it, so the object lifts out)
-    front.poly([(x0 - gap - wall, ptop), (x0 - gap, ptop), (x0 - gap, yb + gap), (x1 + gap, yb + gap),
-                (x1 + gap, ptop), (x1 + gap + wall, ptop), (x1 + gap + wall, yb + gap + wall),
-                (x0 - gap - wall, yb + gap + wall)], HOLDER, 0.85)
-    # the object: a hammer, head down
-    front.rect(x0, 150, x1 - x0, yb - 150, OBJECT, 0.55)
-    front.rect(cx - 15, 22, 30, 128, OBJECT, 0.55)
-    # lip: covers the gap and the object's edge by the overlap, up to the lip height
-    front.poly([(x0 - gap - wall, ptop), (x0 + ov, ptop), (x0 + ov, yb - ov), (x1 - ov, yb - ov),
-                (x1 - ov, ptop), (x1 + gap + wall, ptop), (x1 + gap + wall, yb + gap + wall),
-                (x0 - gap - wall, yb + gap + wall)], HOLDER, 0.25, dash=True)
-    front.circle(cx, ptop, 13, "none", dash=True, stroke=DIM)
-    front.leader(cx + 11, ptop - 7, 180, 78, "Thumb notch (diameter)")
-    front.dim(240, yb, 240, ptop, "Pocket depth", 244, (ptop + yb) / 2 - 2, "start")
-    front.text(244, (ptop + yb) / 2 + 10, "(% of height, or mm)", anchor="start", size=9)
-    front.line(x1 + gap + wall, ptop, 244, ptop, dash=True, sw=0.6)
-    front.line(x1, yb, 244, yb, dash=True, sw=0.6)
-    front.dim(x0 - gap - wall, 226, x0 - gap, 226, "Wall", x0 - gap - wall - 4, 230, "end")
-    front.dim(x0 - gap, 214, x0, 214, "Gap", x0 + 4, 218, "start")
-    front.dim(x0, 136, x0 + ov, 136, "Lip overlap", x0 - 26, 140, "end")
-    front.line(x0 - gap - wall, yb + gap + wall, x0 - gap - wall, 230, dash=True, sw=0.6)
-    front.line(x0 - gap, yb + gap, x0 - gap, 230, dash=True, sw=0.6)
-    front.line(x0, yb, x0, 218, dash=True, sw=0.6)
-    front.leader(x1 + gap + 6, yb - 4, 236, 222, "lip (in front)")
-    side = Sketch(220, "Pocket: side section")
-    _side_section(side, 70, 148, "Lip thickness")
-    side.dim(206, 148, 206, 70, "Lip height", 210, 100, "start")
-    side.text(210, 112, "(% of pocket)", anchor="start", size=9)
-    side.text(210, 132, "Flat bottom: underside", anchor="start", size=9, italic=True)
-    side.text(210, 143, "flattened to print", anchor="start", size=9, italic=True)
-    side.text(210, 154, "upright", anchor="start", size=9, italic=True)
+                              "supports (dashed line)", "make one flat face.", "(A pocket's bottom is", "flat at Bottom Y.)"]):
+        side.text(204, 120 + 12 * i, line, anchor="start", size=9, color=DIM)
+    side.dim(206, bot, 206, top, "Lip height", 210, 82, "start")
+    side.text(210, 94, "(% of held height)", anchor="start", size=9)
     return LEGEND + front.svg() + side.svg()
 
 
@@ -312,4 +292,4 @@ def pegs_sketch() -> str:
     return LEGEND + side.svg() + front.svg()
 
 
-SKETCHES = {"ring": ring_sketch, "pocket": pocket_sketch, "shelf": shelf_sketch, "pegs": pegs_sketch}
+SKETCHES = {"flat": flat_sketch, "shelf": shelf_sketch, "pegs": pegs_sketch}

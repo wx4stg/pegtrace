@@ -83,18 +83,18 @@ class PegboardParams(param.Parameterized):
 class FlatParams(param.Parameterized):
     """Holder that cradles the object flat against the pegboard."""
 
-    style = param.Selector(
-        default="ring", objects=["ring", "pocket"],
-        doc="Ring: a band around a narrow part, with a wider part above resting on it (hammer head, "
-            "the bar of a T, pliers joint). Pocket: a cradle around the bottom of the object.",
-    )
-    ring_top = param.Number(105.0, bounds=(0.5, 1000), step=0.5,
-                            doc="Height on the object (mm above its lowest point) where its wide part rests "
-                                "on the ring: the top of the ring. Click the front view to set it.")
-    ring_height = param.Number(10.0, bounds=(3, 60), step=0.5, doc="Height of the ring band (mm)")
+    top_y = param.Number(
+        105.0, bounds=(0.5, 1000), step=0.5,
+        doc="Top of the holder: a height on the object, in mm above its lowest point. For a ring, where "
+            "the object's wider part rests on it. Click near the line in the Front view to move it.")
+    bottom_y = param.Number(
+        95.0, bounds=(-100, 1000), step=0.5,
+        doc="Bottom of the holder, in mm above the object's lowest point. Above 0, the object hangs through "
+            "it: a ring, with sloped supports underneath. At or below 0, the space under the object is "
+            "filled in down to here: a pocket with a floor.")
     plate_below = param.Number(
         0.0, bounds=(0, 100), step=0.5,
-        doc="How far the back plate reaches below the sloped supports under the ring (mm). At 0 the "
+        doc="Rings only: how far the back plate reaches below the sloped supports under the ring (mm). At 0 the "
             "plate's bottom continues their slope, so the whole underside is one flat face: lay it on the "
             "bed to print the holder at an angle.")
     object_thickness = param.Number(
@@ -104,15 +104,13 @@ class FlatParams(param.Parameterized):
     clear_z = param.Number(1.0, bounds=(0, 10), step=0.1, doc="Extra depth beyond object thickness (mm)")
     wall = param.Number(2.4, bounds=(0.8, 15), step=0.1, doc="Wall thickness (mm)")
     back_t = param.Number(3.0, bounds=(1, 15), step=0.1, doc="Back plate thickness (mm)")
-    pocket_mode = param.Selector(default="percent", objects=["percent", "mm"])
-    pocket_percent = param.Number(40.0, bounds=(5, 100), step=1, doc="Pocket depth, % of object height")
-    pocket_mm = param.Number(30.0, bounds=(2, 500), step=1, doc="Pocket depth (mm)")
     lip = param.Boolean(True, doc="Front lip that stops the object tipping forward")
     lip_overlap = param.Number(4.0, bounds=(0.5, 100), step=0.5, doc="How far the lip covers the object's face (mm)")
     lip_t = param.Number(2.0, bounds=(0.8, 10), step=0.1, doc="Lip thickness (mm)")
-    lip_height_percent = param.Number(100.0, bounds=(10, 100), step=5, doc="Lip height, % of pocket depth")
-    flat_bottom = param.Boolean(True, doc="Flatten the underside so it prints upright with no supports")
-    notch = param.Boolean(False, doc="Thumb notch at the top of the pocket")
+    lip_height_percent = param.Number(100.0, bounds=(10, 100), step=5,
+                                      doc="Lip height, % of the held height: Top Y down to the object's "
+                                          "bottom or Bottom Y, whichever is higher")
+    notch = param.Boolean(False, doc="Thumb notch at the top of the holder")
     notch_d = param.Number(20.0, bounds=(5, 80), step=1, doc="Thumb notch diameter (mm)")
 
 
@@ -150,14 +148,13 @@ _LABELS = {
         "tab_margin": "Plate margin around pegs (mm)",
     },
     FlatParams: {
-        "style": "Holder style", "ring_top": "Ring top: height on the object (mm)", "ring_height": "Ring height (mm)",
+        "top_y": "Top Y: top of the holder (mm)", "bottom_y": "Bottom Y: bottom of the holder (mm)",
         "plate_below": "Back plate below the ring supports (mm)",
         "object_thickness": "Object thickness (mm)", "clear_xy": "Gap around outline (mm)",
         "clear_z": "Extra depth (mm)", "wall": "Wall thickness (mm)", "back_t": "Back plate thickness (mm)",
-        "pocket_mode": "Pocket depth in", "pocket_percent": "Pocket depth (% of height)",
-        "pocket_mm": "Pocket depth (mm)", "lip": "Front lip", "lip_overlap": "Lip overlap (mm)",
-        "lip_t": "Lip thickness (mm)", "lip_height_percent": "Lip height (% of pocket)",
-        "flat_bottom": "Flat bottom (print upright)", "notch": "Thumb notch", "notch_d": "Notch diameter (mm)",
+        "lip": "Front lip", "lip_overlap": "Lip overlap (mm)",
+        "lip_t": "Lip thickness (mm)", "lip_height_percent": "Lip height (% of held height)",
+        "notch": "Thumb notch", "notch_d": "Notch diameter (mm)",
     },
     ShelfParams: {
         "clear_xy": "Gap around outline (mm)", "pocket_depth": "Pocket depth (mm)",

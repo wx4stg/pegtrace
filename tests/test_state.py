@@ -64,7 +64,7 @@ def test_project_roundtrip(ready_state):
 
 def test_project_without_photo(ready_state):
     s, _ = ready_state
-    s.flat.ring_top = 77
+    s.flat.top_y = 77
     s.rebuild()
     full, small = s.to_json(), s.to_json(include_photo=False)
     assert len(small) < len(full) / 20
@@ -74,7 +74,7 @@ def test_project_without_photo(ready_state):
     s2.from_json(full)  # a photo on screen from another project
     s2.from_json(small)
     assert s2.photo is None and s2.calibration is None and s2.corners_px == []
-    assert s2.flat.ring_top == 77 and s2.direction == s.direction
+    assert s2.flat.top_y == 77 and s2.direction == s.direction
     assert s2.outline.symmetric_difference(s.outline).area < 1.0
     assert s2.result.solid.volume() == pytest.approx(s.result.solid.volume(), rel=1e-3)
 
@@ -98,3 +98,56 @@ def test_bad_outline_reports_error():
     s.set_outline(Polygon([(0, 0), (1e-3, 0), (0, 1e-3)]))
     # degenerate outline: either no result or an error message, never an exception
     assert s.result is None or s.result.solid.is_valid()
+
+
+def test_new_outline_or_direction_suggests_the_band():
+    from shapely import affinity
+    from shapely.geometry import box
+
+    s = AppState()
+    t = box(-40, 100, 40, 120).union(box(-10, 0, 10, 100))  # a T, bar up (direction 270 keeps it so)
+    s.set_outline(t, simplify=False)
+    assert s.flat.bottom_y > 0 and s.result.info["style"] == "ring" and not s.stale
+    s.flat.top_y = 50  # the user's choice survives an edit of the outline
+    s.set_outline(affinity.scale(t, 1.02, 1.0), simplify=False)
+    assert s.flat.top_y == 50
+    s.direction = 90  # turned over: bar down, so a pocket
+    assert s.flat.bottom_y < 0 and s.result.info["style"] == "pocket" and not s.stale
+
+
+def test_old_projects_keep_their_holder(ready_state):
+    """Projects saved with the ring and pocket styles load as Top Y and Bottom Y."""
+    import json
+
+    s, _ = ready_state
+    doc = json.loads(s.to_json(include_photo=False))
+    flat = {k: v for k, v in doc["flat"].items() if k not in ("top_y", "bottom_y")}
+    ring = dict(flat, style="ring", ring_top=60, ring_height=12)
+    s2 = AppState()
+    s2.from_json(json.dumps(dict(doc, flat=ring)))
+    assert (s2.flat.top_y, s2.flat.bottom_y) == (60, 48)
+    height = s2.oriented_outline().bounds[3] - s2.oriented_outline().bounds[1] + 2 * s2.flat.clear_xy
+    pocket = dict(flat, style="pocket", pocket_mode="percent", pocket_percent=50, flat_bottom=True)
+    s2.from_json(json.dumps(dict(doc, flat=pocket)))
+    assert s2.flat.top_y == pytest.approx(0.5 * height - s2.flat.clear_xy, abs=0.5)
+    assert s2.flat.bottom_y == pytest.approx(-(s2.flat.clear_xy + s2.flat.wall))
+    pocket = dict(flat, style="pocket", pocket_mode="mm", pocket_mm=30)
+    s2.from_json(json.dumps(dict(doc, flat=pocket)))
+    assert s2.flat.top_y == pytest.approx(30 - s2.flat.clear_xy)
+    assert s2.result is not None and s2.result.info["style"] == "pocket"
+
+
+def test_mode_round_trip_keeps_the_band():
+    from shapely.geometry import box
+
+    s = AppState()
+    s.set_outline(box(-40, 100, 40, 120).union(box(-10, 0, 10, 100)), simplify=False)
+    s.flat.param.update(top_y=80, bottom_y=70)
+    s.mode = "shelf"
+    s.mode = "flat"
+    assert (s.flat.top_y, s.flat.bottom_y) == (80, 70)
+    # traced in shelf mode, then switched to flat: that outline gets a suggestion
+    s2 = AppState(mode="shelf")
+    s2.set_outline(box(-40, 100, 40, 120).union(box(-10, 0, 10, 100)), simplify=False)
+    s2.mode = "flat"
+    assert s2.flat.bottom_y > 0 and s2.result.info["style"] == "ring"

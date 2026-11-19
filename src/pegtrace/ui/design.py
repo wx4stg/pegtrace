@@ -16,10 +16,10 @@ from .diagrams import SKETCHES
 
 PEG_FIELDS = ["preset", "spacing", "hole_d", "board_t", "peg_clear", "board_clear", "hook_rise", "hook_bend", "columns",
               "max_pegs", "stride", "add_pins", "pin_rows", "pin_length", "peg_profile", "tab_margin"]
-RING_FIELDS = ["style", "ring_top", "ring_height", "object_thickness", "clear_xy", "clear_z", "wall", "back_t",
-               "plate_below", "lip_t"]
-FLAT_FIELDS = ["style", "object_thickness", "pocket_mode", "pocket_percent", "pocket_mm", "clear_xy", "clear_z", "wall",
-               "back_t", "lip", "lip_overlap", "lip_t", "lip_height_percent", "flat_bottom", "notch", "notch_d"]
+FLAT_FIELDS = ["top_y", "bottom_y", "object_thickness", "clear_xy", "clear_z", "wall", "back_t", "plate_below",
+               "lip", "lip_overlap", "lip_t", "lip_height_percent", "notch", "notch_d"]
+BAND_COLORS = {"top_y": "#e15759", "bottom_y": "#4e79a7"}
+BAND_LABELS = {"top_y": "Top Y", "bottom_y": "Bottom Y"}
 SHELF_FIELDS = ["pocket_depth", "through", "floor_t", "clear_xy", "shelf_wall", "back_t", "rim_height", "rim_t",
                 "gussets", "gusset_t", "object_height"]
 PLA_DENSITY = 1.24  # g/cm³
@@ -53,7 +53,7 @@ class DesignStep:
         self.state = state
         self.on_done = on_done
         self.alert = status_alert()
-        self.suggest = pn.widgets.Button(name="Suggest pocket depth", button_type="default")
+        self.suggest = pn.widgets.Button(name="Suggest Top Y and Bottom Y", button_type="default")
         self.suggest.on_click(self._on_suggest)
         self.live3d = pn.widgets.Checkbox(name="Update 3D view live", value=True)
         self.show_board = pn.widgets.Checkbox(name="Show pegboard", value=True)
@@ -75,67 +75,76 @@ class DesignStep:
         self.next.on_click(lambda _: self._rebuild(then=on_done) if state.stale else on_done() if on_done else None)
         self.peg_panel = param_panel(state.pegboard, PEG_FIELDS)
         self.flat_panel = param_panel(state.flat, FLAT_FIELDS)
-        self.ring_panel = param_panel(state.flat, RING_FIELDS)
-        self.ring_help = help_text("**Ring**: a band around a narrow part of the object, just below a wider "
-                                   "part that rests on it. Hang the object wide end up (*Auto* on the "
-                                   "Orientation step picks that way up). Set *Ring top* to the height on the "
-                                   "object where the wide part should sit, or click that height in the "
-                                   "**Front** view; the dashed red line shows it. The front bar uses the lip "
-                                   "thickness.")
-        # the ring top on the front view: moves with the setting at once (no rebuild needed),
-        # and a click on the view sets it
-        # The ring top on the front view: a plain Bokeh line moved straight from Python, so
-        # it follows the setting at once (no rebuild) without HoloViews redrawing the plot
-        # (which made BokehJS 3.9 lose the legend). A click on the view sets it.
-        self.ring_marks = None  # (Span, Label) of the current front plot
-        self.ring_tap = None  # recreated with each front view
-        state.flat.param.watch(lambda e: self._move_ring_marks(), ["ring_top", "style"])
-        state.param.watch(lambda e: self._move_ring_marks(), ["mode", "outline", "direction"])
-        state.param.watch(lambda e: self._fit_ring_slider(), ["outline", "direction"])
-        self._fit_ring_slider()
+        self.flat_help = help_text(
+            "**Top Y** and **Bottom Y** are heights on the object, in mm above its lowest point; the dashed "
+            "lines in the **Front** view show them, and a click there moves the nearer one. With Bottom Y "
+            "**above 0** the object hangs through the holder: a **ring** around a narrow part, with a wider "
+            "part above resting on it (set Top Y just under the wide part). At or **below 0** the space under "
+            "the object is filled in: a **pocket** it sits in. A new outline or direction gets a suggestion: a "
+            "ring when the object gets wider going up and a ring can hold it, else a pocket.")
+        # The band's lines on the front view: plain Bokeh lines moved straight from Python, so
+        # they follow the settings at once (no rebuild) without HoloViews redrawing the plot
+        # (which made BokehJS 3.9 lose the legend). A click on the view moves the nearer one.
+        self.band_marks = None  # {setting: (Span, Label)} of the current front plot
+        self.band_tap = None  # recreated with each front view
+        state.flat.param.watch(lambda *_: self._move_band_marks(), ["top_y", "bottom_y"])
+        state.param.watch(lambda *_: self._move_band_marks(), ["mode", "outline", "direction"])
+        state.param.watch(lambda *_: self._fit_band_sliders(), ["outline", "direction"])
+        self._fit_band_sliders()
         self.shelf_panel = param_panel(state.shelf, SHELF_FIELDS)
         state.param.watch(lambda e: self._update_3d(), "result")
         for w in (self.show_board, self.show_object):
             w.param.watch(lambda e: self._update_3d(force=True), "value")
 
-    def _ring_on(self) -> bool:
-        return self.state.mode == "flat" and self.state.flat.style == "ring"
+    def _band_on(self) -> bool:
+        return self.state.mode == "flat"
 
-    def _ring_hook(self, plot, element):
-        """HoloViews hook: add the ring top line and its label to a new front plot."""
+    def _band_hook(self, plot, element):
+        """HoloViews hook: add the Top Y and Bottom Y lines and labels to a new front plot."""
         from bokeh.models import Label, Span
 
-        if getattr(plot, "_ring_marks", None) is None:
-            span = Span(location=0, dimension="width", line_color="#e15759", line_dash="dashed", line_width=2)
-            label = Label(x=0, y=0, text="ring top", text_color="#e15759", text_font_size="10pt",
-                          x_offset=4, y_offset=2)
-            plot.state.add_layout(span)
-            plot.state.add_layout(label)
-            plot._ring_marks = (span, label)
-        self.ring_marks = plot._ring_marks
-        self._move_ring_marks()
+        if getattr(plot, "_band_marks", None) is None:
+            marks = {}
+            for key, color in BAND_COLORS.items():
+                span = Span(location=0, dimension="width", line_color=color, line_dash="dashed", line_width=2)
+                label = Label(x=0, y=0, text=BAND_LABELS[key], text_color=color, text_font_size="10pt",
+                              x_offset=4, y_offset=2 if key == "top_y" else -16)
+                plot.state.add_layout(span)
+                plot.state.add_layout(label)
+                marks[key] = (span, label)
+            plot._band_marks = marks
+        self.band_marks = plot._band_marks
+        self._move_band_marks()
 
-    def _move_ring_marks(self):
-        if self.ring_marks is None:
+    def _move_band_marks(self):
+        if self.band_marks is None:
             return
-        span, label = self.ring_marks
         o = self.state.oriented_outline()
-        on = self._ring_on() and o is not None
-        y = float(self.state.flat.ring_top)  # the oriented object's lowest point is y = 0
-        span.update(location=y, visible=on)
-        label.update(x=float(o.bounds[2]) if o is not None else 0.0, y=y, visible=on)
+        on = self._band_on() and o is not None
+        for key, (span, label) in self.band_marks.items():
+            y = float(getattr(self.state.flat, key))  # the oriented object's lowest point is y = 0
+            span.update(location=y, visible=on)
+            label.update(x=float(o.bounds[2]) if o is not None else 0.0, y=y, visible=on)
 
     def _on_front_tap(self, x=None, y=None):
-        if y is None or not self._ring_on():
+        """A click on the front view moves the nearer of Top Y and Bottom Y there."""
+        if y is None or not self._band_on():
             return
-        self.state.flat.ring_top = min(max(round(float(y) * 2) / 2, 0.5), 1000.0)
+        fp = self.state.flat
+        y = round(float(y) * 2) / 2
+        if abs(y - fp.top_y) <= abs(y - fp.bottom_y):
+            fp.top_y = min(max(y, 0.5), 1000.0)
+        else:
+            fp.bottom_y = min(max(y, -100.0), 1000.0)
 
-    def _fit_ring_slider(self):
-        """The ring top slider spans the object's height."""
+    def _fit_band_sliders(self):
+        """The Top Y and Bottom Y sliders span the object's height (Bottom Y a little below it)."""
         o = self.state.oriented_outline()
         if o is None:
             return
-        self.ring_panel._widgets["ring_top"].end = max(1.0, float(np.ceil(o.bounds[3] - o.bounds[1])))
+        h = max(1.0, float(np.ceil(o.bounds[3] - o.bounds[1])))
+        self.flat_panel._widgets["top_y"].end = h
+        self.flat_panel._widgets["bottom_y"].param.update(start=-20.0, end=h)
 
     def _update_3d(self, force=False):
         """Refresh the 3D view, but only while its tab is showing, and debounced: replacing
@@ -174,22 +183,24 @@ class DesignStep:
         run_busy(self.preview, work)
 
     def _on_suggest(self, _):
-        pct = self.state.suggest_pocket()
-        if pct is None:
-            show(self.alert, "No pocket depth up to 95 % holds this shape securely; check the direction.", "warning")
-        else:
-            show(self.alert, f"Pocket depth set to {pct:.0f} % of the object's height.", "success")
-            self._rebuild()
+        kind = self.state.suggest_band()
+        if kind is None:
+            show(self.alert, "Trace an outline first.", "warning")
+            return
+        fp = self.state.flat
+        what = ("a ring: the object gets wider going up" if kind == "ring"
+                else "a pocket: the object doesn't get wider going up enough to hang it in a ring")
+        show(self.alert, f"Top Y {fp.top_y:g} mm, Bottom Y {fp.bottom_y:g} mm: {what}.", "success")
+        self._rebuild()
 
     def view(self):
         state = self.state
 
-        @pn.depends(state.param.mode, state.flat.param.style)
-        def holder_settings(mode, style):
-            if mode == "flat" and style == "ring":
-                return pn.Column(diagram("ring"), self.ring_panel, self.ring_help, sizing_mode="stretch_width")
+        @pn.depends(state.param.mode)
+        def holder_settings(mode):
             if mode == "flat":
-                return pn.Column(diagram("pocket"), self.flat_panel, self.suggest, sizing_mode="stretch_width")
+                return pn.Column(diagram("flat"), self.flat_help, self.suggest, self.flat_panel,
+                                 sizing_mode="stretch_width")
             return pn.Column(diagram("shelf"), self.shelf_panel, sizing_mode="stretch_width")
 
         @pn.depends(state.param.result, state.param.error)
@@ -205,6 +216,7 @@ class DesignStep:
             sx, sy, sz = info["size_mm"]
             grams = info["volume_cm3"] * PLA_DENSITY
             items.append(pn.pane.Markdown(
+                (f"**{info['style'].capitalize()}** &nbsp; " if "style" in info else "") +
                 f"**Size:** {sx:.0f} × {sy:.0f} × {sz:.0f} mm &nbsp; **Volume:** {info['volume_cm3']:.1f} cm³ "
                 f"(≈ {grams:.0f} g PLA at 100 % infill) &nbsp; **Hooks:** {info['hooks']} &nbsp; "
                 f"**Pins:** {info['pins']}", margin=(0, 10)))
@@ -221,9 +233,9 @@ class DesignStep:
         def front(result):
             if result is None:
                 return placeholder()
-            el = front_view(result, state.pegboard).opts(hv.opts.Overlay(hooks=[equal_aspect, self._ring_hook]))
-            self.ring_tap = hv.streams.Tap(source=el, transient=True)  # click to set the ring top
-            self.ring_tap.add_subscriber(self._on_front_tap)
+            el = front_view(result, state.pegboard).opts(hv.opts.Overlay(hooks=[equal_aspect, self._band_hook]))
+            self.band_tap = hv.streams.Tap(source=el, transient=True)  # click to move Top Y or Bottom Y
+            self.band_tap.add_subscriber(self._on_front_tap)
             return el
 
         @pn.depends(state.param.result)

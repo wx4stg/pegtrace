@@ -285,39 +285,39 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
 
         r.step = "step 5: design"
         r.wait_text("Size:")
-        r.check(page.get_by_text("Ring top: height on the object").first.is_visible(), "ring style by default")
+        r.check(page.get_by_text("Top Y: top of the holder").first.is_visible()
+                and page.get_by_text("Bottom Y: bottom of the holder").first.is_visible(), "Top Y and Bottom Y settings")
         r.check(page.get_by_text("Diagram: what these settings change").first.is_visible()
-                and page.get_by_text("Ring: front view").first.is_visible(), "diagram of the ring settings shows")
-        # the default ring top is too low for the T: the warning says where to put it
-        warn = page.get_by_text(re.compile(r"set the ring top to [\d.]+ mm")).first.inner_text()
-        top = re.search(r"set the ring top to ([\d.]+) mm", warn).group(1)
-        r.check(True, f"ring too low: the warning suggests {top} mm")
-        r.shot("ring_default")
+                and page.get_by_text("Front view: Top Y and Bottom Y").first.is_visible(), "diagram of the settings shows")
         boxes = page.get_by_role("textbox").locator("visible=true")
-        ring_top, ring_height = boxes.nth(0), boxes.nth(1)
-        default_top = "105"  # FlatParams.ring_top's default
-        r.check(ring_top.input_value() == default_top and ring_height.input_value() == "10",
-                f"ring top and height have boxes to type in ({ring_top.input_value()}, {ring_height.input_value()})")
-        # a click on the front view sets the ring top
+        top_box, bottom_box = boxes.nth(0), boxes.nth(1)
+        summary = page.get_by_text(re.compile(r"Size:.*Volume")).first.inner_text()
+        style = "Ring" if summary.startswith("Ring") else "Pocket"
+        top0, bottom0 = top_box.input_value(), bottom_box.input_value()
+        r.check((float(bottom0) > 0) == (style == "Ring") and summary.startswith(style),
+                f"the new direction got a suggestion: a {style.lower()}, Top Y {top0}, Bottom Y {bottom0}")
+        r.check(page.get_by_text("No problems found.").first.is_visible(), "the suggestion holds it without warnings")
+        r.shot("design_suggested")
+        # a click on the front view moves the nearer line
         fb = r.visible_canvas()
         page.mouse.click(fb["x"] + fb["width"] / 2, fb["y"] + fb["height"] * 0.3)
         for _ in range(240):
-            if ring_top.input_value() != default_top:
+            if (top_box.input_value(), bottom_box.input_value()) != (top0, bottom0):
                 break
             page.wait_for_timeout(250)
-        r.check(ring_top.input_value() != default_top, f"clicking the front view set the ring top ({ring_top.input_value()})")
+        moved = (top_box.input_value(), bottom_box.input_value())
+        r.check(moved != (top0, bottom0), f"clicking the front view moved a line (Top Y, Bottom Y: {moved})")
         r.wait_text("Settings changed", timeout=30_000)
-        # type the suggested ring top and a taller ring, then update
-        ring_top.fill(top)
-        ring_top.press("Enter")
-        ring_height.fill("14")
-        ring_height.press("Enter")
-        page.wait_for_timeout(500)
-        r.click("Update holder")
+        # the suggestion puts them back, and rebuilds
+        r.click("Suggest Top Y and Bottom Y")
         page.wait_for_function("t => !document.body.innerText.includes(t)", arg="Settings changed", timeout=120_000)
         r.wait_text("No problems found.", timeout=120_000)
-        r.check(True, f"typed ring top {top} mm and ring height 14 mm: the T is held without warnings")
-        r.shot("ring_set")
+        for _ in range(120):  # the boxes can update a moment after the holder
+            if (top_box.input_value(), bottom_box.input_value()) == (top0, bottom0):
+                break
+            page.wait_for_timeout(250)
+        now = (top_box.input_value(), bottom_box.input_value())
+        r.check(now == (top0, bottom0), f"Suggest Top Y and Bottom Y restored {top0} / {bottom0} and rebuilt ({now})")
         page.wait_for_timeout(1500)
         fv = page.evaluate("""() => {
           const all = Bokeh.documents.flatMap(d => [...d.all_models]);
@@ -359,12 +359,13 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
         r.tab("5 · Design")
         r.wait_text("Size:")
 
-        print("step 5c: pocket style")
+        print("step 5c: the other kind of holder")
 
-        r.step = "step 5c: pocket style"
+        r.step = "step 5c: the other kind of holder"
         size_before = page.get_by_text(re.compile(r"Size:.*Volume")).first.inner_text()
-        page.locator("select:has(option:text-is('pocket'))").first.select_option("pocket")
-        r.wait_text("Suggest pocket depth", timeout=30_000)
+        other = "Pocket" if style == "Ring" else "Ring"
+        bottom_box.fill("-8" if other == "Pocket" else f"{float(top0) - 10:g}")
+        bottom_box.press("Enter")
         r.wait_text("Settings changed", timeout=30_000)
         r.check(page.get_by_text(re.compile(r"Size:.*Volume")).first.inner_text() == size_before,
                 "changing a setting waits for Update holder")
@@ -386,12 +387,12 @@ def steps(r: Run, page: Page, url: str, boot_timeout: float) -> None:
         page.wait_for_timeout(500)
         log = page.evaluate("window.__loading")
         size_after = page.get_by_text(re.compile(r"Size:.*Volume")).first.inner_text()
-        r.check(any(on for _, _, on in log) and size_after != size_before,
-                f"Update holder rebuilt the holder (as a pocket) with a spinner ({size_before} -> {size_after}, "
+        r.check(any(on for _, _, on in log) and size_after.startswith(other) and size_after != size_before,
+                f"Update holder rebuilt it as a {other.lower()} with a spinner ({size_before} -> {size_after}, "
                 f"{len(log)} loading updates)")
-        r.shot("pocket_front")
+        r.shot(f"{other.lower()}_front")
         r.tab("Side section")
-        r.shot("pocket_side")
+        r.shot(f"{other.lower()}_side")
         r.tab("Front")
 
         print("step 6: export")

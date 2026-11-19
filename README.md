@@ -31,21 +31,23 @@ locally with `panel serve`, or as a **fully static web page** with Python runnin
      red polygon to make its vertices appear, then drag them. A slider smooths or simplifies it; edited
      points are kept exactly.
 4. **Orientation**: pick the mount style, then set the arrow.
-   - **Flat**: the object hangs against the board, held by a ring around a narrow part (the default) or
-     (Design step) a pocket-style cradle. The arrow points *down*.
+   - **Flat**: the object hangs against the board, in a ring around a narrow part or a pocket around its
+     bottom. The arrow points *down*.
    - **Shelf**: the outline becomes a pocket in a shelf that sticks out from the board. The arrow points
      *toward the board*.
-   - *Auto* makes the long axis vertical. For the ring style it picks the way up that has a wide part
-     resting on a narrow one; for the pocket style, the heavier end goes down.
+   - *Auto* makes the long axis vertical, the way up that a ring can hold (a wide part above a narrow
+     one) if there is one, else the heavier end down.
 5. **Design**: adjust the holder and pegboard settings. Drag a slider, or type an exact value in the box
    next to its name.
-   - A labelled diagram above each group of settings shows what each one changes (ring, pocket or shelf,
-     and the pegs).
+   - A labelled diagram above each group of settings shows what each one changes (the flat holder, the
+     shelf, and the pegs).
    - Changing a setting doesn't rebuild the holder straight away (it takes seconds on the static site).
      Press **Update holder** to see the front, side-section, top and 3D views with the new settings.
      Exporting, or *Continue to export*, rebuilds first if settings changed.
-   - Warnings flag a shallow pocket, a single hook, an object that can tip out, and similar problems.
-   - *Suggest pocket depth* finds the smallest pocket that holds the object securely.
+   - Warnings flag a shallow pocket, a ring the object slides through, a single hook, an object that can
+     tip out, and similar problems.
+   - A new outline or direction sets **Top Y** and **Bottom Y** to a suggestion (see below); *Suggest Top Y
+     and Bottom Y* does it again.
 6. **Export**: download the STL, standing upright ready to print (turn it in your slicer if you like). You
    can also save or load a project file that holds the photo, reference points, outline and all settings.
    Type a name for each file before downloading it. Untick *Include the photo* for a project file of a
@@ -60,36 +62,39 @@ rotated so that gravity points to −y.
 - `Pc = P` grown by the clearance. `U = sweep_up(Pc)` is the Minkowski sum of Pc with a vertical segment:
   every point the object passes through while it is lifted straight out. **No material is placed inside U**,
   so the object can always be removed upwards, and the cavity has no overhangs when printed upright.
-- Walls are U grown by the wall thickness, clipped at the pocket top, minus U. Growing U rather than the
-  outline keeps them the full thickness where a wider part of the object sweeps past a narrower one. Gaps
-  in U narrower than a wall are filled in first, and anything still thinner than the wall thickness is
-  removed, so no wall is ever thinner than the setting. They extrude over the object's thickness, in front
-  of a back plate.
-- An optional **front lip** in front of the object stops it tipping forward. It leaves a window and never
-  blocks the lift-out path.
-- **Flat bottom** sweeps everything down to a common floor, so the part prints standing up with no supports.
+- The holder is a band between two heights on the object, **Top Y** and **Bottom Y**, in mm above its
+  lowest point. Type them, or click in the Front view, where dashed lines show them: a click moves the nearer
+  one.
+  - **Bottom Y at or below 0** reaches under the object, and the band is filled in under it down to Bottom
+    Y: a **pocket** the object stands in, with a flat bottom that prints standing up with no supports. The
+    floor is at least a wall thick (a higher Bottom Y is lowered to that, with a warning).
+  - **Bottom Y above 0**: the object hangs through the band, a **ring** around a narrow part, held by a
+    wider part above it (a hammer head-up, a T, pliers by the joint). Set Top Y just under the wide part.
+    If the object would slide down before its wide part meets the ring, or slide right through, a warning
+    says so and suggests the Top Y that holds it.
+- **Suggestion**: a new outline or direction gets a ring if the object gets clearly wider going up and a ring
+  10 mm tall can hold it: something above the ring sticks out past the part inside it by at least half a
+  wall (and 1 mm), the ring fits above the object's bottom, and the object rests on it without sliding or
+  tipping out. Several parts can pass through one ring (the two handles of pliers, each through its own
+  opening). Otherwise it suggests a pocket deep enough to hold the object securely. A loaded project keeps
+  its own values, and so does an edit of the outline.
+- Walls are U, inside the band, grown by the wall thickness, minus U. Growing U rather than the outline
+  keeps them the full thickness where a wider part of the object sweeps past a narrower one. Gaps in U
+  narrower than a wall are filled in first, and anything still thinner than the wall thickness is removed,
+  so no wall is ever thinner than the setting. They extrude over the object's thickness, in front of a back
+  plate.
+- In a ring, U only covers the part of the object in the band: parts below it that flare out are threaded
+  through by tilting the object, rather than cutting the ring open.
+- An optional **front lip** in front of the object stops it tipping forward. It covers the object's edges by
+  the *Lip overlap*, leaves a window and never blocks the lift-out path.
+- A ring's underside slopes back to the board at about 50° from horizontal, so it still prints upright
+  without supports. The supports under it are at least the wall thickness everywhere; where a leaning part
+  cuts into a support, the support reaches out to a full wall's thickness from it. The back plate's bottom
+  follows the same slope, so the whole underside is one flat face: lay it on the bed to print the holder at
+  an angle. *Back plate below the ring supports* lowers the plate by that many mm (default 0).
 - **Stability check**: the outline is dropped onto the walls. The part then checks two things: whether the
   centroid sits between the contact points, and how far a bump can rotate the object about each contact
   before the walls catch it.
-
-**Flat mode, ring style (default)**
-
-For objects with a wide part above a narrow one (a hammer head-up, a T, pliers by the joint), a full pocket
-isn't needed.
-- You set the ring top: the height on the object where its wide part should sit (type it, or click that
-  height in the Front view, where a dashed line shows it). If the object would slide down before its wide
-  part meets the ring, or slide right through, a warning says so and suggests the height that holds it.
-- A band of walls, plus the back plate and a closed front bar, circles the narrow part (one loop per part
-  when there are several, like the two handles of pliers). The wide part rests on the band, and everything
-  below hangs free through it. The loops only clear the object where it sits in them: parts below that
-  flare out are threaded through by tilting the object, rather than cutting the loops open. The loops and
-  the supports under them are at least the wall thickness everywhere; where a leaning part cuts into a
-  support, the support reaches out to a full wall's thickness from it.
-- The band's underside slopes back to the board at about 50° from horizontal, so it still prints upright
-  without supports. The back plate's bottom follows the same slope, so the whole underside is one flat
-  face: lay it on the bed to print the holder at an angle. *Back plate below the ring supports* lowers the
-  plate by that many mm (default 0).
-- *Auto* on the Orientation step picks whichever way up a ring can hold.
 
 **Shelf mode**
 - The footprint (grown by the clearance) is cut into a shelf slab, either as a pocket of the chosen depth or
@@ -166,7 +171,7 @@ Notes on the browser runtime:
 The end-to-end test drives every step with real clicks:
 - loads the sample photo and calibrates;
 - draws a polygon by hand, clears it, then auto-detects the outline;
-- picks an orientation and checks the views, including Shelf mode and the ring style;
+- picks an orientation and checks the views, including Shelf mode, a ring and a pocket;
 - downloads the STL;
 - saves the project and loads it back;
 - fails on any browser console error.
@@ -184,7 +189,7 @@ src/pegtrace/
   csg.py          Manifold adapter: Python manifold3d or JS manifold-3d
   pegs.py         peg layout and solids
   holder_flat.py  flat-mode holder        holder_shelf.py  shelf-mode holder
-  stability.py    rest position / tip checks, pocket-depth suggestion
+  stability.py    rest position / tip checks, pocket-depth search
   preview.py      HoloViews views, 3D scene      vtkjs.py  .vtkjs writer + pane
   export.py       binary STL                     state.py  app state, project files
   app.py, ui/     Panel UI (one module per step)

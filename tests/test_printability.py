@@ -25,7 +25,7 @@ def body_without_pegs(result):
 
 
 def test_flat_body_has_no_overhangs(hammer):
-    r = build_flat(hammer, FlatParams(style="pocket", flat_bottom=True), PegboardParams())
+    r = build_flat(hammer, FlatParams(top_y=64, bottom_y=-4), PegboardParams())
     assert overhang_area(oriented(body_without_pegs(r), "print (upright)")) < 1.0
 
 
@@ -39,5 +39,5 @@ def test_flat_ring_has_no_overhangs():
     from shapely.geometry import box
 
     t = box(-40, 100, 40, 120).union(box(-10, 0, 10, 100))
-    r = build_flat(t, FlatParams(style="ring", ring_top=99), PegboardParams())
+    r = build_flat(t, FlatParams(top_y=99, bottom_y=89), PegboardParams())
     assert overhang_area(oriented(body_without_pegs(r), "print (upright)")) < 1.0

@@ -1,4 +1,4 @@
-"""Will the object stay in a flat-mode cradle?
+"""Will the object stay in a flat-mode holder?
 
 All checks are 2D, in the holder frame (y up). The object outline ``P`` (no
 clearance) is dropped onto the walls, then we test whether gravity can tip it
@@ -105,16 +105,16 @@ def check_flat(outline: Polygon, walls) -> StabilityReport:
     if not balanced and falling is None:
         report.stable = False
         report.messages.append(
-            f"Object tips out of the pocket under its own weight (rotates more than {MAX_TILT} degrees "
-            "freely); increase the pocket depth.")
+            f"Object tips out of the holder under its own weight (rotates more than {MAX_TILT} degrees "
+            "freely); raise Top Y.")
         return report
     if not balanced and falling > SECURE_TILT:
         report.messages.append(
-            f"Object leans about {falling:.0f} degrees before the walls catch it; a deeper pocket holds it snugly.")
+            f"Object leans about {falling:.0f} degrees before the walls catch it; a higher Top Y holds it snugly.")
     if report.catch_angle is None:
         report.messages.append(
             f"A sideways bump could knock the object out (it can rotate more than {MAX_TILT} degrees); "
-            "consider a deeper pocket.")
+            "consider a higher Top Y.")
     return report
 
 
@@ -122,21 +122,22 @@ def is_secure(rep: StabilityReport) -> bool:
     return rep.stable and rep.catch_angle is not None and rep.catch_angle <= SECURE_TILT
 
 
-def suggest_pocket_percent(outline: Polygon, fp, pb, start: int = 10, stop: int = 95, step: int = 5) -> float | None:
-    """Smallest pocket depth (% of height) that keeps the object secure (see ``is_secure``)."""
-    from .holder_flat import flat_regions
+def suggest_pocket_top(outline: Polygon, fp, pb, bottom_y: float, start: int = 10, stop: int = 95,
+                       step: int = 5) -> float | None:
+    """Lowest Top Y (mm above the object's lowest point) for a pocket down to ``bottom_y`` that
+    keeps the object secure (see ``is_secure``), trying depths of ``start`` to ``stop`` % of
+    the object's height (with the gap around it)."""
+    from .holder_flat import flat_regions, with_band
 
-    trial = fp.param.values()
-    trial["pocket_mode"] = "percent"
-    tmp = type(fp)(**{k: v for k, v in trial.items() if k != "name"})
+    y0 = outline.bounds[1]
     pc = outline.buffer(fp.clear_xy)
     height = pc.bounds[3] - pc.bounds[1]
     min_depth = max(3 * fp.wall, 10.0)  # absolute minimum for a practical cradle
     for pct in range(start, stop + 1, step):
         if pct / 100 * height < min_depth and pct < stop:
             continue
-        tmp.pocket_percent = pct
-        reg = flat_regions(outline, tmp, pb)
+        top_y = pc.bounds[1] + pct / 100 * height - y0
+        reg = flat_regions(outline, with_band(fp, max(top_y, 0.5), bottom_y), pb)
         if is_secure(check_flat(outline, reg.walls)):
-            return float(pct)
+            return float(top_y)
     return None

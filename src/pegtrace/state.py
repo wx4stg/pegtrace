@@ -22,6 +22,29 @@ RULER = "Two points (ruler)"
 PROJECT_VERSION = 1
 
 
+def legacy_flat(vals: dict, doc: dict) -> dict:
+    """Flat settings from a project saved before the ring and pocket styles became one holder
+    set by Top Y and Bottom Y."""
+    vals = dict(vals)
+    style = vals.pop("style", "pocket")
+    ring_top, ring_height = vals.pop("ring_top", 40.0), vals.pop("ring_height", 10.0)
+    mode, pct, mm = vals.pop("pocket_mode", "percent"), vals.pop("pocket_percent", 40.0), vals.pop("pocket_mm", 30.0)
+    vals.pop("flat_bottom", None)
+    clear = vals.get("clear_xy", FlatParams.param.clear_xy.default)
+    if style == "ring":
+        vals.update(top_y=ring_top, bottom_y=ring_top - ring_height)
+        return vals
+    height = 100.0
+    if doc.get("outline_mm"):
+        o = orient_polygon(Polygon(doc["outline_mm"]), doc.get("direction", 270.0))
+        height = o.bounds[3] - o.bounds[1] + 2 * clear  # the old pocket depth counted the gap
+    depth = pct / 100 * height if mode == "percent" else mm
+    depth = min(max(depth, 0.5), height)
+    wall = vals.get("wall", FlatParams.param.wall.default)
+    vals.update(top_y=max(depth - clear, 0.5), bottom_y=-(clear + wall))
+    return vals
+
+
 def load_image(data: bytes) -> Image.Image:
     img = Image.open(io.BytesIO(data))
     img = ImageOps.exif_transpose(img)
@@ -71,6 +94,9 @@ class AppState(param.Parameterized):
         super().__init__(**params)
         for obj in (self.pegboard, self.flat, self.shelf):
             obj.param.watch(self._params_changed, [p for p in obj.param if p != "name"])
+        self._loading = False
+        self._band_for = None  # (outline, direction) the last suggestion was made for
+        self.param.watch(self._geometry_changed, ["outline", "mode", "direction"])
 
     # ------------------------------------------------------------ photo
     def set_photo(self, img: Image.Image | None, name: str = "") -> None:
@@ -161,23 +187,40 @@ class AppState(param.Parameterized):
             self.outline = p if not p.is_empty else None
 
     def auto_direction(self) -> None:
-        """Long axis vertical. Pocket style: heavier end down. Ring style: whichever way up
-        has a narrow part under a wide part to hang it by (e.g. a T the right way up)."""
+        """Long axis vertical. In flat mode, whichever way up has a wider part over a narrower
+        one to hang it by in a ring (a T the right way up), else the heavier end down for a
+        pocket. Then suggest the holder's top and bottom for that way up."""
         if self.outline is None:
             return
         angle = auto_down_angle(self.outline)
-        if self.mode == "flat" and self.flat.style == "ring":
-            from .holder_flat import ring_level
+        if self.mode == "flat":
+            from .holder_flat import find_ring
 
-            def score(a):
-                pc = orient_polygon(self.outline, a).buffer(self.flat.clear_xy, quad_segs=12)
-                found = ring_level(pc, self.flat)
-                return found[1] if found else -1.0
+            def score(a):  # 2: a ring holds it securely, 1: a ring holds it, 0: no ring
+                ring = find_ring(orient_polygon(self.outline, a), self.flat, self.pegboard)
+                return 0 if ring is None else 2 if ring[2] else 1
 
             flipped = (angle + 180.0) % 360.0
             if score(flipped) > score(angle):
                 angle = flipped
-        self.direction = angle
+        if angle != self.direction:
+            self.direction = angle  # suggests the band and rebuilds (see _geometry_changed)
+        else:
+            self.suggest_band()
+            self.rebuild()
+
+    def suggest_band(self) -> str | None:
+        """Set Top Y and Bottom Y for the current outline and direction: a ring if the object
+        gets wider going up and a ring holds it, else a pocket. Returns which, or None."""
+        from .holder_flat import suggest_band
+
+        o = self.oriented_outline()
+        if o is None or self.mode != "flat":
+            return None
+        top_y, bottom_y, kind = suggest_band(o, self.flat, self.pegboard)
+        self.flat.param.update(top_y=top_y, bottom_y=bottom_y)
+        self._band_for = self._band_key()
+        return kind
 
     def oriented_outline(self) -> Polygon | None:
         if self.outline is None:
@@ -190,7 +233,21 @@ class AppState(param.Parameterized):
         # date; the Design step's Update button (or an export) rebuilds it.
         self.stale = True
 
-    @param.depends("outline", "mode", "direction", watch=True)
+    def _geometry_changed(self, *events):
+        """A new outline (not an edit of one), another direction or a switch to flat mode makes
+        the old Top Y and Bottom Y meaningless: suggest new ones, then rebuild. A project
+        being loaded keeps its own."""
+        new_shape = any(e.name == "outline" and e.old is None for e in events)
+        turned = any(e.name == "direction" for e in events)
+        # back to flat mode: only if this outline and direction never had a suggestion
+        to_flat = any(e.name == "mode" for e in events) and self._band_for != self._band_key()
+        if not self._loading and (new_shape or turned or to_flat):
+            self.suggest_band()
+        self.rebuild()
+
+    def _band_key(self):
+        return (id(self.outline), self.direction)
+
     def rebuild(self):
         from .holder_flat import build_flat
         from .holder_shelf import build_shelf
@@ -210,17 +267,6 @@ class AppState(param.Parameterized):
         except Exception as e:  # keep the UI alive on odd geometry
             self.error = f"Could not build the holder: {e}"
             self.result = None
-
-    def suggest_pocket(self) -> float | None:
-        from .stability import suggest_pocket_percent
-
-        o = self.oriented_outline()
-        if o is None:
-            return None
-        pct = suggest_pocket_percent(o, self.flat, self.pegboard)
-        if pct is not None:
-            self.flat.param.update(pocket_mode="percent", pocket_percent=pct)
-        return pct
 
     def stl_bytes(self) -> bytes:
         from .export import solid_stl
@@ -278,6 +324,17 @@ class AppState(param.Parameterized):
         doc = json.loads(text)
         if doc.get("app") != "pegtrace":
             raise ValueError("Not a PegTrace project file.")
+        self._loading = True
+        try:
+            self._load(doc)
+        finally:
+            self._loading = False
+        self._band_for = self._band_key()  # the project's own values count as chosen
+        self.rebuild()
+
+    def _load(self, doc: dict) -> None:
+        if doc.get("flat") and "top_y" not in doc["flat"]:
+            doc["flat"] = legacy_flat(doc["flat"], doc)
         for key, obj in (("pegboard", self.pegboard), ("flat", self.flat), ("shelf", self.shelf),
                          ("export", self.export)):
             vals = doc.get(key) or {}
@@ -310,4 +367,3 @@ class AppState(param.Parameterized):
             self.set_outline(Polygon(doc["outline_mm"]))
         if not has_photo:
             self.param.trigger("calibration")  # redraw the Trace view around the outline
-        self.rebuild()

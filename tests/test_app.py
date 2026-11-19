@@ -102,11 +102,11 @@ def test_design_update_button(app):
 
 def test_design_numbers_can_be_typed(app):
     design = app.steps[4]
-    panel = design.ring_panel
-    assert isinstance(panel._widgets["ring_height"], pn.widgets.EditableFloatSlider)
+    panel = design.flat_panel
+    assert isinstance(panel._widgets["bottom_y"], pn.widgets.EditableFloatSlider)
     assert isinstance(design.peg_panel._widgets["columns"], pn.widgets.EditableIntSlider)
-    panel._widgets["ring_height"].value = 17.5  # typed into the box
-    assert app.state.flat.ring_height == 17.5 and app.state.stale
+    panel._widgets["bottom_y"].value = 17.5  # typed into the box
+    assert app.state.flat.bottom_y == 17.5 and app.state.stale
 
 
 def test_setting_diagrams_are_valid_svg():
@@ -175,3 +175,15 @@ def test_load_project_with_other_file_names(app):
     assert "Could not" not in export.alert.object, export.alert.object
     assert export.stl.filename == "cutters.stl"
     assert state.outline is not None
+
+
+def test_front_view_click_moves_the_nearer_line(app):
+    design = app.steps[4]
+    fp = app.state.flat
+    fp.param.update(top_y=60, bottom_y=40)
+    design._on_front_tap(0, 57.2)
+    assert (fp.top_y, fp.bottom_y) == (57.0, 40)
+    design._on_front_tap(0, 31.4)
+    assert (fp.top_y, fp.bottom_y) == (57.0, 31.5)
+    design._on_front_tap(0, -6)  # below the object: a pocket's floor
+    assert fp.bottom_y == -6
